@@ -35,5 +35,16 @@ services:
       db:
         condition: service_healthy
 
+  web:
+    build:
+      context: src/Vanalytics.Web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      API_PROXY_TARGET: "http://api:8080"
+    depends_on:
+      - api
+
 volumes:
   sqldata:
