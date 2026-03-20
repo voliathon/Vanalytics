@@ -62,7 +62,7 @@ The .NET side follows a clean architecture split:
 
 ### Web UI
 - **Local auth:** username/password registration and login, passwords hashed with a strong algorithm (bcrypt or Argon2).
-- **OAuth:** Google and/or Microsoft account login.
+- **OAuth:** Google and Microsoft account login (both implemented for MVP).
 - **Token format:** JWT issued on login, short-lived access token + refresh token.
 - **Seeded admin:** The first user (admin) is seeded via environment variables (`ADMIN_EMAIL`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`) defined in `docker-compose.yml` locally and as secrets in GitHub Actions for production.
 
@@ -95,8 +95,7 @@ The .NET side follows a clean architecture split:
 | UserId | GUID | FK → Users |
 | Name | string | FFXI character name |
 | Server | string | FFXI server name |
-| ActiveJobId | enum (JobType) | Currently active job |
-| LicenseStatus | enum | Unlicensed, Active, Expired |
+| LicenseStatus | enum | Unlicensed, Active, Expired (default: Unlicensed) |
 | IsPublic | bool | Toggles public profile visibility |
 | LastSyncAt | DateTimeOffset | Nullable, last successful addon sync |
 | CreatedAt | DateTimeOffset | |
@@ -111,7 +110,7 @@ The .NET side follows a clean architecture split:
 | CharacterId | GUID | FK → Characters |
 | JobId | enum (JobType) | One of 22 FFXI jobs |
 | Level | int | 1-99 (or master level beyond) |
-| IsActive | bool | Whether this is the currently set job |
+| IsActive | bool | Whether this is the currently set job (single source of truth for active job) |
 
 **Unique constraint:** (CharacterId, JobId)
 
@@ -303,4 +302,4 @@ Stored in an Azure Storage Account backend.
 
 Users sign up for free. To track a character, they must have an active license for that character. The billing and payment system is deferred to a future iteration, but the data model supports it from day one via `Characters.LicenseStatus`.
 
-For the MVP, all characters created by the seeded admin will be set to `Active` license status. License enforcement logic in the sync endpoint will check this status and reject syncs for unlicensed characters with a 403 response.
+New characters default to `Unlicensed` status. For the MVP, the seeded admin's characters will be manually set to `Active` license status. License enforcement logic in the sync endpoint will check this status and reject syncs for unlicensed characters with a 403 response.
