@@ -1,0 +1,19 @@
+# Visual Studio client-specific #
+######################
+.vs
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Claude CLI
+.claude/*
+!.claude/settings.json
+!.claude/commands/
+!.claude/commands/**
