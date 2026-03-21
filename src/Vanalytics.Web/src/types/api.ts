@@ -228,3 +228,24 @@ export interface CrossServerResponse {
   days: number
   servers: CrossServerPrice[]
 }
+
+// Bazaar
+export interface BazaarZoneGroup {
+  zone: string
+  playerCount: number
+  players: BazaarPlayer[]
+}
+
+export interface BazaarPlayer {
+  playerName: string
+  lastSeenAt: string
+}
+
+export interface BazaarListingItem {
+  sellerName: string
+  price: number
+  quantity: number
+  zone: string
+  lastSeenAt: string
+  serverName: string
+}

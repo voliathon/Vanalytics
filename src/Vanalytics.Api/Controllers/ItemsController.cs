@@ -230,6 +230,40 @@ public class ItemsController : ControllerBase
         return Ok(new { days, servers = serverPrices });
     }
 
+    [HttpGet("{id:int}/bazaar")]
+    public async Task<IActionResult> BazaarListings(
+        int id,
+        [FromQuery] string? server = null)
+    {
+        var itemExists = await _db.GameItems.AnyAsync(i => i.ItemId == id);
+        if (!itemExists) return NotFound();
+
+        var query = _db.BazaarListings
+            .Where(l => l.ItemId == id && l.IsActive);
+
+        if (!string.IsNullOrEmpty(server))
+        {
+            var srv = await _db.GameServers.FirstOrDefaultAsync(s => s.Name == server);
+            if (srv is null) return BadRequest(new { message = $"Unknown server: {server}" });
+            query = query.Where(l => l.ServerId == srv.Id);
+        }
+
+        var listings = await query
+            .OrderBy(l => l.Price)
+            .Select(l => new
+            {
+                l.SellerName,
+                l.Price,
+                l.Quantity,
+                l.Zone,
+                l.LastSeenAt,
+                ServerName = l.Server.Name,
+            })
+            .ToListAsync();
+
+        return Ok(listings);
+    }
+
     // FFXI job bitmask: bit 0 is unused (no job), WAR starts at bit 1.
     // This matches the actual Windower Resources items.lua bitmask values.
     private static int? GetJobBitmask(string jobAbbr)

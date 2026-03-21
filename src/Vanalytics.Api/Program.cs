@@ -57,6 +57,7 @@ builder.Services.AddHttpClient("PlayOnline", client =>
 builder.Services.AddHostedService<ServerStatusScraper>();
 builder.Services.AddHostedService<ItemImageDownloader>();
 builder.Services.AddHostedService<ItemDatabaseSyncJob>();
+builder.Services.AddHostedService<BazaarStalenessJob>();
 
 var app = builder.Build();
 

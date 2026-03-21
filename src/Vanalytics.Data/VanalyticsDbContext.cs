@@ -15,6 +15,8 @@ public class VanalyticsDbContext(DbContextOptions<VanalyticsDbContext> options) 
     public DbSet<GameItem> GameItems => Set<GameItem>();
     public DbSet<ServerStatusChange> ServerStatusChanges => Set<ServerStatusChange>();
     public DbSet<AuctionSale> AuctionSales => Set<AuctionSale>();
+    public DbSet<BazaarPresence> BazaarPresences => Set<BazaarPresence>();
+    public DbSet<BazaarListing> BazaarListings => Set<BazaarListing>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

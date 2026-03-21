@@ -1,11 +1,12 @@
 // src/Vanalytics.Web/src/pages/ItemDetailPage.tsx
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import type { GameItemDetail, PriceHistoryResponse, CrossServerResponse, GameServer } from '../types/api'
+import type { GameItemDetail, PriceHistoryResponse, CrossServerResponse, GameServer, BazaarListingItem } from '../types/api'
 import ItemStatsTable from '../components/economy/ItemStatsTable'
 import PriceHistoryChart from '../components/economy/PriceHistoryChart'
 import CrossServerChart from '../components/economy/CrossServerChart'
 import SalesTable from '../components/economy/SalesTable'
+import BazaarListingsTable from '../components/economy/BazaarListingsTable'
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -17,6 +18,7 @@ export default function ItemDetailPage() {
   const [days, setDays] = useState(30)
   const [salesPage, setSalesPage] = useState(1)
   const [loading, setLoading] = useState(true)
+  const [bazaarListings, setBazaarListings] = useState<BazaarListingItem[]>([])
 
   // Load item detail
   useEffect(() => {
@@ -49,6 +51,14 @@ export default function ItemDetailPage() {
       .then(setPrices)
       .catch(() => setPrices(null))
   }, [id, selectedServer, days, salesPage])
+
+  useEffect(() => {
+    if (!selectedServer) return
+    fetch(`/api/items/${id}/bazaar?server=${selectedServer}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then(setBazaarListings)
+      .catch(() => setBazaarListings([]))
+  }, [id, selectedServer])
 
   // Load cross-server comparison
   useEffect(() => {
@@ -175,10 +185,10 @@ export default function ItemDetailPage() {
             />
           </div>
 
-          {/* Bazaar placeholder */}
+          {/* Bazaar listings */}
           <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-            <h2 className="text-sm font-semibold text-gray-400 mb-3">Bazaar Listings</h2>
-            <p className="text-sm text-gray-500">Coming soon — bazaar tracking will be available in a future update.</p>
+            <h2 className="text-sm font-semibold text-gray-400 mb-3">Bazaar Listings — {selectedServer}</h2>
+            <BazaarListingsTable listings={bazaarListings} />
           </div>
         </div>
       </div>
