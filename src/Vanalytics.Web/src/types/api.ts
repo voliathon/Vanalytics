@@ -119,3 +119,112 @@ export interface AdminUser {
   createdAt: string
   updatedAt: string
 }
+
+// Items / Economy
+export interface GameItemSummary {
+  itemId: number
+  name: string
+  category: string
+  level: number | null
+  skill: number | null
+  stackSize: number
+  iconPath: string | null
+  isRare: boolean
+  isExclusive: boolean
+  isAuctionable: boolean
+}
+
+export interface GameItemDetail {
+  itemId: number
+  name: string
+  nameJa: string | null
+  nameLong: string | null
+  description: string | null
+  descriptionJa: string | null
+  category: string
+  type: number
+  flags: number
+  stackSize: number
+  level: number | null
+  jobs: number | null
+  races: number | null
+  slots: number | null
+  skill: number | null
+  damage: number | null
+  delay: number | null
+  def: number | null
+  hp: number | null
+  mp: number | null
+  str: number | null
+  dex: number | null
+  vit: number | null
+  agi: number | null
+  int: number | null
+  mnd: number | null
+  chr: number | null
+  accuracy: number | null
+  attack: number | null
+  rangedAccuracy: number | null
+  rangedAttack: number | null
+  magicAccuracy: number | null
+  magicDamage: number | null
+  magicEvasion: number | null
+  evasion: number | null
+  enmity: number | null
+  haste: number | null
+  storeTP: number | null
+  tpBonus: number | null
+  physicalDamageTaken: number | null
+  magicDamageTaken: number | null
+  iconPath: string | null
+  previewImagePath: string | null
+  isRare: boolean
+  isExclusive: boolean
+  isAuctionable: boolean
+}
+
+export interface ItemSearchResult {
+  totalCount: number
+  page: number
+  pageSize: number
+  items: GameItemSummary[]
+}
+
+export interface PriceStats {
+  median: number
+  min: number
+  max: number
+  average: number
+  salesPerDay: number
+}
+
+export interface AhSale {
+  price: number
+  soldAt: string
+  sellerName: string
+  buyerName: string
+  stackSize: number
+}
+
+export interface PriceHistoryResponse {
+  totalCount: number
+  page: number
+  pageSize: number
+  days: number
+  stats: PriceStats | null
+  sales: AhSale[]
+}
+
+export interface CrossServerPrice {
+  server: string
+  median: number
+  min: number
+  max: number
+  average: number
+  saleCount: number
+}
+
+export interface CrossServerResponse {
+  days: number
+  servers: CrossServerPrice[]
+}

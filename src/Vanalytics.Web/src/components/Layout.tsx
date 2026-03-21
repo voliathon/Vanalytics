@@ -32,6 +32,8 @@ export default function Layout() {
   const isPublicPage =
     location.pathname === '/' ||
     location.pathname === '/login' ||
+    location.pathname.startsWith('/items') ||
+    location.pathname.startsWith('/bazaar') ||
     (!user && !location.pathname.startsWith('/dashboard'))
 
   if (isPublicPage) {

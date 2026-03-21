@@ -10,6 +10,9 @@ import ProfilePage from './pages/ProfilePage'
 import SetupGuidePage from './pages/SetupGuidePage'
 import ServerStatusPage from './pages/ServerStatusPage'
 import AdminUsersPage from './pages/AdminUsersPage'
+import ItemDatabasePage from './pages/ItemDatabasePage'
+import ItemDetailPage from './pages/ItemDetailPage'
+import BazaarActivityPage from './pages/BazaarActivityPage'
 import PublicProfilePage from './pages/PublicProfilePage'
 
 export default function App() {
@@ -68,6 +71,9 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="/items" element={<ItemDatabasePage />} />
+            <Route path="/items/:id" element={<ItemDetailPage />} />
+            <Route path="/bazaar" element={<BazaarActivityPage />} />
             <Route path="/:server/:name" element={<PublicProfilePage />} />
           </Route>
         </Routes>
