@@ -6,9 +6,18 @@ export default function LandingPage() {
 
   return (
     <div className="text-center py-20">
-      <h1 className="text-5xl font-bold mb-4">
-        <span className="text-blue-400">Vanalytics</span>
-      </h1>
+      <div className="flex items-center justify-center gap-4 mb-6 mx-auto max-w-xl px-4">
+        <img
+          src="/vanalytics-square-logo.png"
+          alt=""
+          className="h-20 sm:h-28 shrink-0"
+        />
+        <img
+          src="/vanalytics-typography-horizontal-logo.png"
+          alt="Vana'lytics"
+          className="min-w-0 max-w-full"
+        />
+      </div>
       <p className="text-xl text-gray-400 mb-2">Vana'diel + Analytics</p>
       <p className="text-gray-500 mb-8 max-w-lg mx-auto">
         Track your Final Fantasy XI character progress. Sync your jobs, gear,

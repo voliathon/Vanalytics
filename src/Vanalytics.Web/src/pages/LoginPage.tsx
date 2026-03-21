@@ -83,7 +83,14 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">
       <div className="w-full max-w-md rounded-lg border border-gray-800 bg-gray-900 p-8">
-        <h2 className="mb-6 text-2xl font-bold">
+        <div className="flex justify-center mb-6">
+          <img
+            src="/vanalytics-square-logo.png"
+            alt="Vanalytics"
+            className="h-16 w-16"
+          />
+        </div>
+        <h2 className="mb-6 text-2xl font-bold text-center">
           {isRegister ? 'Create Account' : 'Login'}
         </h2>
 
