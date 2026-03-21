@@ -49,11 +49,14 @@ builder.Services.AddHttpClient();
 builder.Services.AddSingleton<TokenService>();
 builder.Services.AddScoped<OAuthService>();
 builder.Services.AddSingleton<RateLimiter>();
+builder.Services.AddSingleton<EconomyRateLimiter>();
 builder.Services.AddHttpClient("PlayOnline", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
 });
 builder.Services.AddHostedService<ServerStatusScraper>();
+builder.Services.AddHostedService<ItemImageDownloader>();
+builder.Services.AddHostedService<ItemDatabaseSyncJob>();
 
 var app = builder.Build();
 
@@ -76,6 +79,21 @@ using (var scope = app.Services.CreateScope())
         var hash = BCrypt.Net.BCrypt.HashPassword(adminPassword);
         await AdminSeeder.SeedAsync(db, adminEmail, adminUsername, hash, logger);
     }
+
+    // Seed item database (skip in integration tests via config)
+    if (!string.Equals(app.Configuration["SKIP_ITEM_SEED"], "true", StringComparison.OrdinalIgnoreCase))
+    {
+        var httpFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
+        await ItemDatabaseSeeder.SeedAsync(db, httpFactory, logger);
+    }
+}
+
+// HTTPS redirection in production (skipped when behind a reverse proxy
+// that terminates TLS, e.g., Azure Container Apps + Cloudflare)
+if (!app.Environment.IsDevelopment() &&
+    !string.Equals(app.Configuration["DISABLE_HTTPS_REDIRECT"], "true", StringComparison.OrdinalIgnoreCase))
+{
+    app.UseHttpsRedirection();
 }
 
 app.UseAuthentication();

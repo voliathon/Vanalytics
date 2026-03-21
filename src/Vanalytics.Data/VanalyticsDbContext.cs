@@ -12,7 +12,9 @@ public class VanalyticsDbContext(DbContextOptions<VanalyticsDbContext> options) 
     public DbSet<CraftingSkill> CraftingSkills => Set<CraftingSkill>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<GameServer> GameServers => Set<GameServer>();
+    public DbSet<GameItem> GameItems => Set<GameItem>();
     public DbSet<ServerStatusChange> ServerStatusChanges => Set<ServerStatusChange>();
+    public DbSet<AuctionSale> AuctionSales => Set<AuctionSale>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

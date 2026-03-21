@@ -20,5 +20,11 @@ public class EquippedGearConfiguration : IEntityTypeConfiguration<EquippedGear>
             .WithMany(c => c.Gear)
             .HasForeignKey(g => g.CharacterId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<GameItem>()
+            .WithMany()
+            .HasForeignKey(g => g.ItemId)
+            .OnDelete(DeleteBehavior.NoAction)
+            .IsRequired(false);
     }
 }

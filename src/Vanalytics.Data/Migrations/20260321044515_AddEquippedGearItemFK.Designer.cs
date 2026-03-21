@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Vanalytics.Data;
 
@@ -11,9 +12,11 @@ using Vanalytics.Data;
 namespace Vanalytics.Data.Migrations
 {
     [DbContext(typeof(VanalyticsDbContext))]
-    partial class VanalyticsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260321044515_AddEquippedGearItemFK")]
+    partial class AddEquippedGearItemFK
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,59 +24,6 @@ namespace Vanalytics.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("Vanalytics.Core.Models.AuctionSale", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("BuyerName")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int>("ItemId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Price")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset>("ReportedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid>("ReportedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("SellerName")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<int>("ServerId")
-                        .HasColumnType("int");
-
-                    b.Property<DateTimeOffset>("SoldAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<int>("StackSize")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ReportedByUserId");
-
-                    b.HasIndex("ServerId", "SoldAt");
-
-                    b.HasIndex("ItemId", "ServerId", "SoldAt");
-
-                    b.HasIndex("ItemId", "ServerId", "Price", "SoldAt", "BuyerName", "SellerName", "StackSize")
-                        .IsUnique();
-
-                    b.ToTable("AuctionSales");
-                });
 
             modelBuilder.Entity("Vanalytics.Core.Models.Character", b =>
                 {
@@ -532,33 +482,6 @@ namespace Vanalytics.Data.Migrations
                         .HasFilter("[OAuthProvider] IS NOT NULL AND [OAuthId] IS NOT NULL");
 
                     b.ToTable("Users");
-                });
-
-            modelBuilder.Entity("Vanalytics.Core.Models.AuctionSale", b =>
-                {
-                    b.HasOne("Vanalytics.Core.Models.GameItem", "Item")
-                        .WithMany()
-                        .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Vanalytics.Core.Models.User", "ReportedBy")
-                        .WithMany()
-                        .HasForeignKey("ReportedByUserId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
-
-                    b.HasOne("Vanalytics.Core.Models.GameServer", "Server")
-                        .WithMany()
-                        .HasForeignKey("ServerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Item");
-
-                    b.Navigation("ReportedBy");
-
-                    b.Navigation("Server");
                 });
 
             modelBuilder.Entity("Vanalytics.Core.Models.Character", b =>

@@ -364,6 +364,101 @@ windower.register_event('prerender', function()
 end)
 
 -----------------------------------------------------------------------
+-- AH History Packet Capture (packet 0x0E7)
+-- SKELETON: Byte offsets are placeholders. Must be verified in-game
+-- with Windower's PacketViewer addon before this will produce
+-- usable data. Actual FFXI AH history entries are ~52 bytes each.
+-----------------------------------------------------------------------
+windower.register_event('incoming chunk', function(id, data)
+    if id ~= 0x0E7 then return end
+    if settings.ApiKey == '' then return end
+
+    local player = windower.ffxi.get_player()
+    if not player then return end
+
+    local info = windower.ffxi.get_info()
+    local server = res.servers[info.server] and res.servers[info.server].en or 'Unknown'
+
+    -- Parse AH history packet (placeholder offsets - verify in-game)
+    local item_id = data:byte(5) + data:byte(6) * 256
+
+    if item_id == 0 then return end
+
+    local sales = {}
+    local offset = 9
+    local entry_size = 52  -- Approximate; verify with PacketViewer
+
+    while offset + entry_size - 1 <= #data do
+        local price = data:byte(offset) + data:byte(offset + 1) * 256 +
+                       data:byte(offset + 2) * 65536 + data:byte(offset + 3) * 16777216
+
+        if price == 0 then break end
+
+        local timestamp = data:byte(offset + 4) + data:byte(offset + 5) * 256 +
+                          data:byte(offset + 6) * 65536 + data:byte(offset + 7) * 16777216
+
+        -- Buyer name: bytes 8-23 (16 bytes, null-terminated)
+        local buyer_name = ''
+        for i = offset + 8, offset + 23 do
+            local b = data:byte(i)
+            if b == 0 then break end
+            buyer_name = buyer_name .. string.char(b)
+        end
+
+        -- Seller name: bytes 24-39 (16 bytes, null-terminated)
+        local seller_name = ''
+        for i = offset + 24, offset + 39 do
+            local b = data:byte(i)
+            if b == 0 then break end
+            seller_name = seller_name .. string.char(b)
+        end
+
+        table.insert(sales, {
+            price = price,
+            soldAt = os.date('!%Y-%m-%dT%H:%M:%SZ', timestamp),
+            sellerName = seller_name,
+            buyerName = buyer_name,
+            stackSize = 1,
+        })
+
+        offset = offset + entry_size
+    end
+
+    if #sales == 0 then return end
+
+    local payload = json_encode({
+        itemId = item_id,
+        server = server,
+        sales = sales,
+    })
+
+    local url = settings.ApiUrl .. '/api/economy/ah'
+
+    local http = require('socket.http')
+    local ltn12 = require('ltn12')
+    http.TIMEOUT = 5
+
+    local response_body = {}
+    local result, status_code = http.request({
+        url = url,
+        method = 'POST',
+        headers = {
+            ['Content-Type'] = 'application/json',
+            ['Content-Length'] = tostring(#payload),
+            ['X-Api-Key'] = settings.ApiKey,
+        },
+        source = ltn12.source.string(payload),
+        sink = ltn12.sink.table(response_body),
+    })
+
+    if result and status_code == 200 then
+        log('AH data submitted: ' .. #sales .. ' sales for item ' .. item_id)
+    elseif status_code == 429 then
+        log_error('Economy rate limit exceeded')
+    end
+end)
+
+-----------------------------------------------------------------------
 -- Chat commands
 -----------------------------------------------------------------------
 windower.register_event('addon command', function(command, ...)
