@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { LayoutGrid, List } from 'lucide-react'
 import type { ItemSearchResult, StatFilter } from '../types/api'
 import ItemSearchBar from '../components/economy/ItemSearchBar'
@@ -14,19 +15,35 @@ const JOBS = [
 
 type ViewMode = 'cards' | 'table'
 
+function parseStatFilters(params: URLSearchParams): StatFilter[] {
+  return params.getAll('stats').map(s => {
+    const [stat, min, max] = s.split(':')
+    return { stat, min: min || '', max: max || '' }
+  }).filter(sf => sf.stat)
+}
+
+function serializeStatFilters(filters: StatFilter[]): string[] {
+  return filters
+    .filter(sf => sf.min || sf.max)
+    .map(sf => `${sf.stat}:${sf.min}:${sf.max}`)
+}
+
 export default function ItemDatabasePage() {
-  const [query, setQuery] = useState('')
-  const [category, setCategory] = useState('')
-  const [job, setJob] = useState('')
-  const [skill, setSkill] = useState('')
-  const [slots, setSlots] = useState('')
-  const [minLevel, setMinLevel] = useState('')
-  const [maxLevel, setMaxLevel] = useState('')
-  const [statFilters, setStatFilters] = useState<StatFilter[]>([])
-  const [sortBy, setSortBy] = useState('name')
-  const [sortDir, setSortDir] = useState('asc')
-  const [viewMode, setViewMode] = useState<ViewMode>('cards')
-  const [page, setPage] = useState(1)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Read initial state from URL
+  const [query, setQuery] = useState(searchParams.get('q') || '')
+  const [category, setCategory] = useState(searchParams.get('category') || '')
+  const [job, setJob] = useState(searchParams.get('jobs') || '')
+  const [skill, setSkill] = useState(searchParams.get('skill') || '')
+  const [slots, setSlots] = useState(searchParams.get('slots') || '')
+  const [minLevel, setMinLevel] = useState(searchParams.get('minLevel') || '')
+  const [maxLevel, setMaxLevel] = useState(searchParams.get('maxLevel') || '')
+  const [statFilters, setStatFilters] = useState<StatFilter[]>(() => parseStatFilters(searchParams))
+  const [sortBy, setSortBy] = useState(searchParams.get('sortBy') || 'name')
+  const [sortDir, setSortDir] = useState(searchParams.get('sortDir') || 'asc')
+  const [viewMode, setViewMode] = useState<ViewMode>((searchParams.get('view') as ViewMode) || 'cards')
+  const [page, setPage] = useState(Number(searchParams.get('page')) || 1)
   const [result, setResult] = useState<ItemSearchResult | null>(null)
   const [categories, setCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -38,11 +55,34 @@ export default function ItemDatabasePage() {
       .catch(() => {})
   }, [])
 
+  // Sync state → URL (replace, not push, to avoid polluting history with every keystroke)
+  const syncUrl = useCallback(() => {
+    const params = new URLSearchParams()
+    if (query) params.set('q', query)
+    if (category) params.set('category', category)
+    if (job) params.set('jobs', job)
+    if (skill) params.set('skill', skill)
+    if (slots) params.set('slots', slots)
+    if (minLevel) params.set('minLevel', minLevel)
+    if (maxLevel) params.set('maxLevel', maxLevel)
+    if (sortBy && sortBy !== 'name') params.set('sortBy', sortBy)
+    if (sortDir === 'desc') params.set('sortDir', 'desc')
+    if (viewMode !== 'cards') params.set('view', viewMode)
+    for (const s of serializeStatFilters(statFilters)) {
+      params.append('stats', s)
+    }
+    if (page > 1) params.set('page', page.toString())
+    setSearchParams(params, { replace: true })
+  }, [query, category, job, skill, slots, minLevel, maxLevel, statFilters, sortBy, sortDir, viewMode, page, setSearchParams])
+
+  // Reset page when filters change
   useEffect(() => {
     setPage(1)
   }, [query, category, job, skill, slots, minLevel, maxLevel, statFilters, sortBy, sortDir])
 
+  // Fetch data and sync URL
   useEffect(() => {
+    syncUrl()
     setLoading(true)
     const params = new URLSearchParams()
     if (query) params.set('q', query)
@@ -69,7 +109,7 @@ export default function ItemDatabasePage() {
       .then(setResult)
       .catch(() => setResult(null))
       .finally(() => setLoading(false))
-  }, [query, category, job, skill, slots, minLevel, maxLevel, statFilters, sortBy, sortDir, page])
+  }, [query, category, job, skill, slots, minLevel, maxLevel, statFilters, sortBy, sortDir, page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalPages = result ? Math.ceil(result.totalCount / result.pageSize) : 1
 
@@ -82,7 +122,7 @@ export default function ItemDatabasePage() {
     }
   }
 
-  // Build sort options: Name, Level, plus any active stat filter stats
+  // Build sort options: Name, Level, Item Level, plus any active stat filter stats
   const sortOptions: { value: string; label: string }[] = [
     { value: 'name', label: 'Name' },
     { value: 'level', label: 'Level' },
