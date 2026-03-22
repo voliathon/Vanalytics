@@ -105,7 +105,7 @@ function LayoutInner() {
             }`
           }
         >
-          <UserAvatar username={user?.username} size="sm" />
+          <UserAvatar username={user!.username} size="sm" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-gray-200 truncate">{user?.username}</p>
             <p className="text-xs text-gray-500 truncate">{user?.email}</p>

@@ -34,10 +34,8 @@ export default function ItemDatabasePage() {
   // Read initial state from URL
   const [query, setQuery] = useState(searchParams.get('q') || '')
   const [category, setCategory] = useState(searchParams.get('category') || '')
+  const [subCategory, setSubCategory] = useState(searchParams.get('subCategory') || '')
   const [job, setJob] = useState(searchParams.get('jobs') || '')
-  const [skill, setSkill] = useState(searchParams.get('skill') || '')
-  const [slots, setSlots] = useState(searchParams.get('slots') || '')
-  const [itemType, setItemType] = useState(searchParams.get('type') || '')
   const [minLevel, setMinLevel] = useState(searchParams.get('minLevel') || '')
   const [maxLevel, setMaxLevel] = useState(searchParams.get('maxLevel') || '')
   const [statFilters, setStatFilters] = useState<StatFilter[]>(() => parseStatFilters(searchParams))
@@ -54,9 +52,7 @@ export default function ItemDatabasePage() {
     if (query) params.set('q', query)
     if (category) params.set('category', category)
     if (job) params.set('jobs', job)
-    if (skill) params.set('skill', skill)
-    if (slots) params.set('slots', slots)
-    if (itemType) params.set('type', itemType)
+    if (subCategory) params.set('subCategory', subCategory)
     if (minLevel) params.set('minLevel', minLevel)
     if (maxLevel) params.set('maxLevel', maxLevel)
     if (sortBy && sortBy !== 'name') params.set('sortBy', sortBy)
@@ -67,12 +63,12 @@ export default function ItemDatabasePage() {
     }
     if (page > 1) params.set('page', page.toString())
     setSearchParams(params, { replace: true })
-  }, [query, category, job, skill, slots, itemType, minLevel, maxLevel, statFilters, sortBy, sortDir, viewMode, page, setSearchParams])
+  }, [query, category, subCategory, job, minLevel, maxLevel, statFilters, sortBy, sortDir, viewMode, page, setSearchParams])
 
   // Reset page when filters change
   useEffect(() => {
     setPage(1)
-  }, [query, category, job, skill, slots, itemType, minLevel, maxLevel, statFilters, sortBy, sortDir])
+  }, [query, category, subCategory, job, minLevel, maxLevel, statFilters, sortBy, sortDir])
 
   // Fetch data and sync URL
   useEffect(() => {
@@ -81,10 +77,8 @@ export default function ItemDatabasePage() {
     const params = new URLSearchParams()
     if (query) params.set('q', query)
     if (category) params.set('category', category)
+    if (subCategory) params.set('subCategory', subCategory)
     if (job) params.set('jobs', job)
-    if (skill) params.set('skill', skill)
-    if (slots) params.set('slots', slots)
-    if (itemType) params.set('type', itemType)
     if (minLevel) params.set('minLevel', minLevel)
     if (maxLevel) params.set('maxLevel', maxLevel)
     if (sortBy && sortBy !== 'name') params.set('sortBy', sortBy)
@@ -104,7 +98,7 @@ export default function ItemDatabasePage() {
       .then(setResult)
       .catch(() => setResult(null))
       .finally(() => setLoading(false))
-  }, [query, category, job, skill, slots, itemType, minLevel, maxLevel, statFilters, sortBy, sortDir, page]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, category, subCategory, job, minLevel, maxLevel, statFilters, sortBy, sortDir, page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const totalPages = result ? Math.ceil(result.totalCount / result.pageSize) : 1
 
@@ -138,13 +132,9 @@ export default function ItemDatabasePage() {
         <div className="lg:col-span-1 space-y-4">
           <CategoryTree
             selectedCategory={category}
-            selectedSkill={skill}
-            selectedSlots={slots}
-            selectedType={itemType}
+            selectedSubCategory={subCategory}
             onCategoryChange={setCategory}
-            onSkillChange={setSkill}
-            onSlotsChange={setSlots}
-            onTypeChange={setItemType}
+            onSubCategoryChange={setSubCategory}
           />
         </div>
 

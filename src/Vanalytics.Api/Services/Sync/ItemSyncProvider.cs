@@ -73,7 +73,7 @@ public class ItemSyncProvider : ISyncProvider
         // This avoids loading full entities and tracking 30k+ objects.
         var existingHashes = await db.GameItems
             .AsNoTracking()
-            .Select(i => new { i.ItemId, i.Name, i.Category, i.Type, i.Flags, i.StackSize,
+            .Select(i => new { i.ItemId, i.Name, i.Category, i.SubCategory, i.Type, i.Flags, i.StackSize,
                 i.Level, i.Jobs, i.Races, i.Slots, i.Skill, i.ItemLevel,
                 i.Damage, i.Delay, i.DEF, i.HP, i.MP,
                 i.STR, i.DEX, i.VIT, i.AGI, i.INT, i.MND, i.CHR,
@@ -84,7 +84,7 @@ public class ItemSyncProvider : ISyncProvider
                 i.Description, i.DescriptionJa })
             .ToDictionaryAsync(
                 i => i.ItemId,
-                i => ComputeHash(i.Name, i.Category, i.Type, i.Flags, i.StackSize,
+                i => ComputeHash(i.Name, i.Category, i.SubCategory, i.Type, i.Flags, i.StackSize,
                     i.Level, i.Jobs, i.Races, i.Slots, i.Skill, i.ItemLevel,
                     i.Damage, i.Delay, i.DEF, i.HP, i.MP,
                     i.STR, i.DEX, i.VIT, i.AGI, i.INT, i.MND, i.CHR,
@@ -166,6 +166,7 @@ public class ItemSyncProvider : ISyncProvider
                             .SetProperty(i => i.Description, item.Description)
                             .SetProperty(i => i.DescriptionJa, item.DescriptionJa)
                             .SetProperty(i => i.Category, item.Category)
+                            .SetProperty(i => i.SubCategory, item.SubCategory)
                             .SetProperty(i => i.Type, item.Type)
                             .SetProperty(i => i.Flags, item.Flags)
                             .SetProperty(i => i.StackSize, item.StackSize)
@@ -242,7 +243,7 @@ public class ItemSyncProvider : ISyncProvider
     /// </summary>
     private static string ComputeItemHash(GameItem item)
     {
-        return ComputeHash(item.Name, item.Category, item.Type, item.Flags, item.StackSize,
+        return ComputeHash(item.Name, item.Category, item.SubCategory, item.Type, item.Flags, item.StackSize,
             item.Level, item.Jobs, item.Races, item.Slots, item.Skill, item.ItemLevel,
             item.Damage, item.Delay, item.DEF, item.HP, item.MP,
             item.STR, item.DEX, item.VIT, item.AGI, item.INT, item.MND, item.CHR,

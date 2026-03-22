@@ -1,6 +1,6 @@
 // src/Vanalytics.Web/src/pages/ItemDetailPage.tsx
 import { useState, useEffect } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import type { GameItemDetail, PriceHistoryResponse, CrossServerResponse, GameServer, BazaarListingItem } from '../types/api'
 import ItemStatsTable from '../components/economy/ItemStatsTable'
 import PriceHistoryChart from '../components/economy/PriceHistoryChart'

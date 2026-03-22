@@ -9,6 +9,8 @@ public class GameItem
     public string? Description { get; set; }
     public string? DescriptionJa { get; set; }
     public string Category { get; set; } = string.Empty;
+    /// <summary>Player-friendly subcategory derived during import (e.g., "Medicines", "Scrolls", "Materials").</summary>
+    public string? SubCategory { get; set; }
     public int Type { get; set; }
     public int Flags { get; set; }
     public int StackSize { get; set; } = 1;

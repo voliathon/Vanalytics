@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, X } from 'lucide-react'
 
-// Each browse category maps to a combination of API filters (category, skill, slots, type)
+// Each browse category maps to API filter: category + subCategory
 interface FilterSet {
   category?: string
-  skill?: string
-  slots?: string
-  type?: string
+  subCategory?: string
 }
 
 interface BrowseSubcategory {
@@ -16,107 +14,77 @@ interface BrowseSubcategory {
 
 interface BrowseCategory {
   label: string
-  filters?: FilterSet  // if clicking the top-level category itself should filter
+  filters?: FilterSet
   subcategories?: BrowseSubcategory[]
 }
 
-// FFXIAH-style category hierarchy, mapped to Windower data fields
+// Player-friendly browse hierarchy — subcategories match the SubCategory field computed during import
 const BROWSE_CATEGORIES: BrowseCategory[] = [
   {
     label: 'Weapons',
     filters: { category: 'Weapon' },
     subcategories: [
-      { label: 'Hand-to-Hand', filters: { category: 'Weapon', skill: '1' } },
-      { label: 'Daggers', filters: { category: 'Weapon', skill: '2' } },
-      { label: 'Swords', filters: { category: 'Weapon', skill: '3' } },
-      { label: 'Great Swords', filters: { category: 'Weapon', skill: '4' } },
-      { label: 'Axes', filters: { category: 'Weapon', skill: '5' } },
-      { label: 'Great Axes', filters: { category: 'Weapon', skill: '6' } },
-      { label: 'Scythes', filters: { category: 'Weapon', skill: '7' } },
-      { label: 'Polearms', filters: { category: 'Weapon', skill: '8' } },
-      { label: 'Katana', filters: { category: 'Weapon', skill: '9' } },
-      { label: 'Great Katana', filters: { category: 'Weapon', skill: '10' } },
-      { label: 'Clubs', filters: { category: 'Weapon', skill: '11' } },
-      { label: 'Staves', filters: { category: 'Weapon', skill: '12' } },
-      { label: 'Archery', filters: { category: 'Weapon', skill: '25' } },
-      { label: 'Marksmanship', filters: { category: 'Weapon', skill: '26' } },
+      { label: 'Hand-to-Hand', filters: { category: 'Weapon', subCategory: 'Hand-to-Hand' } },
+      { label: 'Daggers', filters: { category: 'Weapon', subCategory: 'Daggers' } },
+      { label: 'Swords', filters: { category: 'Weapon', subCategory: 'Swords' } },
+      { label: 'Great Swords', filters: { category: 'Weapon', subCategory: 'Great Swords' } },
+      { label: 'Axes', filters: { category: 'Weapon', subCategory: 'Axes' } },
+      { label: 'Great Axes', filters: { category: 'Weapon', subCategory: 'Great Axes' } },
+      { label: 'Scythes', filters: { category: 'Weapon', subCategory: 'Scythes' } },
+      { label: 'Polearms', filters: { category: 'Weapon', subCategory: 'Polearms' } },
+      { label: 'Katana', filters: { category: 'Weapon', subCategory: 'Katana' } },
+      { label: 'Great Katana', filters: { category: 'Weapon', subCategory: 'Great Katana' } },
+      { label: 'Clubs', filters: { category: 'Weapon', subCategory: 'Clubs' } },
+      { label: 'Staves', filters: { category: 'Weapon', subCategory: 'Staves' } },
+      { label: 'Archery', filters: { category: 'Weapon', subCategory: 'Archery' } },
+      { label: 'Marksmanship', filters: { category: 'Weapon', subCategory: 'Marksmanship' } },
     ],
   },
   {
     label: 'Armor',
     filters: { category: 'Armor' },
     subcategories: [
-      { label: 'Shields', filters: { category: 'Armor', slots: 'Sub' } },
-      { label: 'Head', filters: { category: 'Armor', slots: 'Head' } },
-      { label: 'Neck', filters: { category: 'Armor', slots: 'Neck' } },
-      { label: 'Body', filters: { category: 'Armor', slots: 'Body' } },
-      { label: 'Hands', filters: { category: 'Armor', slots: 'Hands' } },
-      { label: 'Waist', filters: { category: 'Armor', slots: 'Waist' } },
-      { label: 'Legs', filters: { category: 'Armor', slots: 'Legs' } },
-      { label: 'Feet', filters: { category: 'Armor', slots: 'Feet' } },
-      { label: 'Back', filters: { category: 'Armor', slots: 'Back' } },
-      { label: 'Earrings', filters: { category: 'Armor', slots: 'Ear' } },
-      { label: 'Rings', filters: { category: 'Armor', slots: 'Ring' } },
+      { label: 'Shields', filters: { category: 'Armor', subCategory: 'Shields' } },
+      { label: 'Head', filters: { category: 'Armor', subCategory: 'Head' } },
+      { label: 'Neck', filters: { category: 'Armor', subCategory: 'Neck' } },
+      { label: 'Body', filters: { category: 'Armor', subCategory: 'Body' } },
+      { label: 'Hands', filters: { category: 'Armor', subCategory: 'Hands' } },
+      { label: 'Waist', filters: { category: 'Armor', subCategory: 'Waist' } },
+      { label: 'Legs', filters: { category: 'Armor', subCategory: 'Legs' } },
+      { label: 'Feet', filters: { category: 'Armor', subCategory: 'Feet' } },
+      { label: 'Back', filters: { category: 'Armor', subCategory: 'Back' } },
+      { label: 'Earrings', filters: { category: 'Armor', subCategory: 'Earrings' } },
+      { label: 'Rings', filters: { category: 'Armor', subCategory: 'Rings' } },
     ],
   },
-  {
-    label: 'Scrolls',
-    filters: { category: 'Usable', type: '7' },
-  },
-  {
-    label: 'Medicines',
-    filters: { category: 'Usable', type: '2' },
-  },
-  {
-    label: 'Crystals',
-    filters: { category: 'Usable', type: '8' },
-  },
-  {
-    label: 'Food',
-    filters: { category: 'Usable', type: '1' },
-  },
-  {
-    label: 'Furnishings',
-    filters: { category: 'General', type: '10' },
-  },
-  {
-    label: 'Materials',
-    filters: { category: 'General', type: '1' },
-  },
-  {
-    label: 'Automaton',
-    filters: { category: 'Automaton' },
-  },
-  {
-    label: 'Others',
-    // No filter — shows everything not covered above (or user can search within)
-  },
+  { label: 'Scrolls', filters: { subCategory: 'Scrolls' } },
+  { label: 'Medicines', filters: { subCategory: 'Medicines' } },
+  { label: 'Food', filters: { subCategory: 'Food' } },
+  { label: 'Fish', filters: { subCategory: 'Fish' } },
+  { label: 'Crystals', filters: { subCategory: 'Crystals' } },
+  { label: 'Furnishings', filters: { subCategory: 'Furnishings' } },
+  { label: 'Materials', filters: { subCategory: 'Materials' } },
+  { label: 'Ninja Tools', filters: { subCategory: 'Ninja Tools' } },
+  { label: 'Automaton', filters: { subCategory: 'Automaton' } },
+  { label: 'Misc', filters: { subCategory: 'Misc' } },
 ]
 
 interface CategoryTreeProps {
   selectedCategory: string
-  selectedSkill: string
-  selectedSlots: string
-  selectedType: string
+  selectedSubCategory: string
   onCategoryChange: (category: string) => void
-  onSkillChange: (skill: string) => void
-  onSlotsChange: (slots: string) => void
-  onTypeChange: (type: string) => void
+  onSubCategoryChange: (subCategory: string) => void
 }
 
-function filtersMatch(a: FilterSet, category: string, skill: string, slots: string, type: string): boolean {
-  return (a.category || '') === category
-    && (a.skill || '') === skill
-    && (a.slots || '') === slots
-    && (a.type || '') === type
+function filtersMatch(f: FilterSet, category: string, subCategory: string): boolean {
+  return (f.category || '') === category && (f.subCategory || '') === subCategory
 }
 
 export default function CategoryTree({
-  selectedCategory, selectedSkill, selectedSlots, selectedType,
-  onCategoryChange, onSkillChange, onSlotsChange, onTypeChange,
+  selectedCategory, selectedSubCategory,
+  onCategoryChange, onSubCategoryChange,
 }: CategoryTreeProps) {
   const [expanded, setExpanded] = useState<string | null>(() => {
-    // Auto-expand the category that matches current filters
     for (const cat of BROWSE_CATEGORIES) {
       if (cat.subcategories && cat.filters?.category === selectedCategory) return cat.label
     }
@@ -125,58 +93,43 @@ export default function CategoryTree({
 
   const applyFilters = (filters: FilterSet) => {
     onCategoryChange(filters.category || '')
-    onSkillChange(filters.skill || '')
-    onSlotsChange(filters.slots || '')
-    onTypeChange(filters.type || '')
+    onSubCategoryChange(filters.subCategory || '')
   }
 
   const clearAll = () => {
     onCategoryChange('')
-    onSkillChange('')
-    onSlotsChange('')
-    onTypeChange('')
+    onSubCategoryChange('')
     setExpanded(null)
   }
 
-  const isAnySelected = selectedCategory !== '' || selectedType !== ''
+  const isAnySelected = selectedCategory !== '' || selectedSubCategory !== ''
 
-  // Check if a specific filter set is currently active
   const isActive = (filters?: FilterSet) => {
     if (!filters) return false
-    return filtersMatch(filters, selectedCategory, selectedSkill, selectedSlots, selectedType)
+    return filtersMatch(filters, selectedCategory, selectedSubCategory)
   }
 
-  // Check if a parent category is active (its filters match, ignoring subcategory-specific fields)
   const isParentActive = (filters?: FilterSet) => {
     if (!filters) return false
     return (filters.category || '') === selectedCategory
-      && (filters.type || '') === selectedType
   }
 
   const handleCategoryClick = (cat: BrowseCategory) => {
     if (cat.subcategories) {
-      // Expandable: toggle expand + apply parent filter
       setExpanded(expanded === cat.label ? null : cat.label)
       if (cat.filters) applyFilters(cat.filters)
     } else if (cat.filters) {
-      // Leaf: toggle selection
       setExpanded(null)
-      if (isActive(cat.filters)) {
-        clearAll()
-      } else {
-        applyFilters(cat.filters)
-      }
+      if (isActive(cat.filters)) clearAll()
+      else applyFilters(cat.filters)
     } else {
-      // "Others" with no filter — clear everything
       clearAll()
     }
   }
 
-  const handleSubcategoryClick = (sub: BrowseSubcategory) => {
+  const handleSubcategoryClick = (sub: BrowseSubcategory, parent: BrowseCategory) => {
     if (isActive(sub.filters)) {
-      // Deselect subcategory, keep parent
-      const parent = BROWSE_CATEGORIES.find(c => c.subcategories?.includes(sub))
-      if (parent?.filters) applyFilters(parent.filters)
+      if (parent.filters) applyFilters(parent.filters)
     } else {
       applyFilters(sub.filters)
     }
@@ -195,25 +148,24 @@ export default function CategoryTree({
       <div>
         {BROWSE_CATEGORIES.map((cat) => {
           const isExpanded = expanded === cat.label
-          const hasSubcategories = !!cat.subcategories
+          const hasSubs = !!cat.subcategories
           const parentActive = isParentActive(cat.filters)
           const exactActive = isActive(cat.filters)
-          // Parent is highlighted if exact match or any subcategory matches
-          const highlighted = exactActive || (parentActive && hasSubcategories)
+          const highlighted = exactActive || (parentActive && hasSubs)
 
           return (
             <div key={cat.label}>
               <button
                 onClick={() => handleCategoryClick(cat)}
                 className={`flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left transition-colors ${
-                  highlighted && (!hasSubcategories || (hasSubcategories && !selectedSkill && !selectedSlots))
+                  highlighted && (!hasSubs || !selectedSubCategory)
                     ? 'bg-blue-600/20 text-blue-400'
                     : highlighted
                     ? 'text-blue-300'
                     : 'text-gray-300 hover:bg-gray-700/50'
                 }`}
               >
-                {hasSubcategories ? (
+                {hasSubs ? (
                   isExpanded ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-gray-500" />
                              : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-gray-500" />
                 ) : (
@@ -222,12 +174,12 @@ export default function CategoryTree({
                 <span className="truncate">{cat.label}</span>
               </button>
 
-              {hasSubcategories && isExpanded && (
+              {hasSubs && isExpanded && (
                 <div className="ml-6 border-l border-gray-700 pl-2">
                   {cat.subcategories!.map((sub) => (
                     <button
                       key={sub.label}
-                      onClick={() => handleSubcategoryClick(sub)}
+                      onClick={() => handleSubcategoryClick(sub, cat)}
                       className={`block w-full px-2 py-1 text-xs text-left transition-colors ${
                         isActive(sub.filters)
                           ? 'bg-blue-600/20 text-blue-400'
