@@ -92,6 +92,15 @@ public class AdminSyncController : ControllerBase
         }
     }
 
+    /// <summary>Public endpoint — returns whether any sync is currently running. No auth required.</summary>
+    [HttpGet("/api/sync/active")]
+    [AllowAnonymous]
+    public IActionResult IsActive()
+    {
+        var running = ProviderIds.Any(pid => _orchestrator.IsRunning(pid));
+        return Ok(new { syncing = running });
+    }
+
     /// <summary>Returns the last progress event for a running sync. Used for polling when reconnecting mid-sync.</summary>
     [HttpGet("{providerId}/current")]
     public IActionResult CurrentProgress(string providerId)

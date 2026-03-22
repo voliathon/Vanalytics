@@ -8,6 +8,7 @@ import { LayoutDashboard, Swords, Menu, ShieldCheck, Users, BookOpen, Radio, Pac
 import { CompareProvider } from './compare/CompareContext'
 import CompareTray from './compare/CompareTray'
 import { SyncProvider } from '../context/SyncContext'
+import SyncBanner from './SyncBanner'
 
 function SidebarLink({ to, label, icon }: { to: string; label: string; icon: ReactNode }) {
   return (
@@ -129,6 +130,8 @@ function LayoutInner() {
             <img src="/vanalytics-typography-horizontal-logo.png" alt="Vana'lytics" className="min-w-0 max-w-[180px]" />
           </Link>
         </header>
+
+        <SyncBanner />
 
         <main className="flex-1 overflow-y-auto p-6 lg:p-8 pb-16">
           <div className="mx-auto max-w-5xl">
