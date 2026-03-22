@@ -6,6 +6,7 @@ import LoginModal from './LoginModal'
 import { LayoutDashboard, Swords, Menu, ShieldCheck, Users, BookOpen, Radio, Package, Store, Database, LogIn, Clock } from 'lucide-react'
 import { CompareProvider } from './compare/CompareContext'
 import CompareTray from './compare/CompareTray'
+import { SyncProvider } from '../context/SyncContext'
 
 function SidebarLink({ to, label, icon }: { to: string; label: string; icon: ReactNode }) {
   return (
@@ -48,6 +49,7 @@ export default function Layout() {
   }
 
   return (
+    <SyncProvider>
     <CompareProvider>
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       {/* Mobile overlay */}
@@ -160,5 +162,6 @@ export default function Layout() {
     <CompareTray />
     {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
     </CompareProvider>
+    </SyncProvider>
   )
 }

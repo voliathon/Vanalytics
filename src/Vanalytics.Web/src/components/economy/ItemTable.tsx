@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowUpDown, ArrowUp, ArrowDown, Settings2 } from 'lucide-react'
 import type { GameItemSummary, StatFilter } from '../../types/api'
 import { useCompare } from '../compare/CompareContext'
+import { itemImageUrl } from '../../utils/imageUrl'
 
 interface ItemTableProps {
   items: GameItemSummary[]
@@ -199,7 +200,7 @@ export default function ItemTable({ items, statFilters, sortBy, sortDir, onSort 
                             className="flex items-center gap-2 hover:text-blue-400 transition-colors"
                           >
                             {item.iconPath ? (
-                              <img src={`/item-images/${item.iconPath}`} alt="" className="h-5 w-5 shrink-0" />
+                              <img src={itemImageUrl(item.iconPath)} alt="" className="h-5 w-5 shrink-0" />
                             ) : (
                               <div className="h-5 w-5 shrink-0 rounded bg-gray-800" />
                             )}

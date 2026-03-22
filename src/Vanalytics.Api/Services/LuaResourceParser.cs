@@ -59,11 +59,15 @@ public static class LuaResourceParser
     private static Dictionary<string, string> ParseFields(string fieldStr)
     {
         var fields = new Dictionary<string, string>();
-        var fieldPattern = new Regex(@"(\w+)\s*=\s*(?:""([^""]*)""|(\-?\d+))", RegexOptions.Compiled);
+        // Match strings with escaped quotes: "value with \"escaped\" quotes"
+        // Or plain integers: 12345
+        var fieldPattern = new Regex(@"(\w+)\s*=\s*(?:""((?:[^""\\]|\\.)*)""|\s*(\-?\d+))", RegexOptions.Compiled);
         foreach (Match m in fieldPattern.Matches(fieldStr))
         {
             var key = m.Groups[1].Value;
-            var value = m.Groups[2].Success ? m.Groups[2].Value : m.Groups[3].Value;
+            var value = m.Groups[2].Success
+                ? m.Groups[2].Value.Replace("\\\"", "\"")  // Unescape Lua escaped quotes
+                : m.Groups[3].Value;
             fields[key] = value;
         }
         return fields;

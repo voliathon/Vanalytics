@@ -1,4 +1,5 @@
 import type { GameItemDetail } from '../../types/api'
+import { itemImageUrl } from '../../utils/imageUrl'
 
 interface Props {
   items: GameItemDetail[]
@@ -58,7 +59,7 @@ export default function CompareTable({ items }: Props) {
               <th key={item.itemId} className="py-2 px-3 text-gray-200 font-medium">
                 <div className="flex items-center gap-2">
                   {item.iconPath ? (
-                    <img src={`/item-images/${item.iconPath}`} alt="" className="h-6 w-6 shrink-0" />
+                    <img src={itemImageUrl(item.iconPath)} alt="" className="h-6 w-6 shrink-0" />
                   ) : (
                     <div className="h-6 w-6 rounded bg-gray-700 shrink-0" />
                   )}

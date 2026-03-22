@@ -4,10 +4,12 @@ import { useParams, Link } from 'react-router-dom'
 import type { GameItemDetail, PriceHistoryResponse, CrossServerResponse, GameServer, BazaarListingItem } from '../types/api'
 import ItemStatsTable from '../components/economy/ItemStatsTable'
 import PriceHistoryChart from '../components/economy/PriceHistoryChart'
+import { itemImageUrl } from '../utils/imageUrl'
 import CrossServerChart from '../components/economy/CrossServerChart'
 import SalesTable from '../components/economy/SalesTable'
 import BazaarListingsTable from '../components/economy/BazaarListingsTable'
 import { useCompare } from '../components/compare/CompareContext'
+import ItemPreviewBox from '../components/economy/ItemPreviewBox'
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -80,18 +82,16 @@ export default function ItemDetailPage() {
       </Link>
 
       {/* Header */}
-      <div className="flex items-start gap-4 mb-8">
-        <div className="shrink-0 flex flex-col items-center gap-2">
-          {item.iconPath ? (
-            <img src={`/item-images/${item.iconPath}`} alt="" className="h-12 w-12" />
-          ) : (
-            <div className="h-12 w-12 rounded bg-gray-800" />
-          )}
-          {item.previewImagePath && (
-            <img src={`/item-images/${item.previewImagePath}`} alt={item.name} className="max-w-[200px] rounded" />
-          )}
-        </div>
-        <div>
+      <div className="flex items-start justify-between gap-4 mb-8">
+        <div className="flex items-start gap-4 min-w-0">
+          <div className="shrink-0">
+            {item.iconPath ? (
+              <img src={itemImageUrl(item.iconPath)} alt="" className="h-12 w-12" />
+            ) : (
+              <div className="h-12 w-12 rounded bg-gray-800" />
+            )}
+          </div>
+          <div className="min-w-0">
           <h1 className="text-2xl font-bold">{item.name}</h1>
           {item.nameJa && <p className="text-sm text-gray-500">{item.nameJa}</p>}
           <div className="flex items-center gap-2 mt-1">
@@ -99,7 +99,7 @@ export default function ItemDetailPage() {
             {item.level && <span className="text-xs text-gray-500">Lv.{item.level}</span>}
             {item.isRare && <span className="text-xs text-amber-500">Rare</span>}
             {item.isExclusive && <span className="text-xs text-red-400">Ex</span>}
-            {item.isAuctionable && <span className="text-xs text-green-400">AH</span>}
+            {!item.isNoAuction && <span className="text-xs text-green-400">AH</span>}
             <span className="text-xs text-gray-600">Stack: {item.stackSize}</span>
           </div>
           {/* Compare button */}
@@ -118,7 +118,7 @@ export default function ItemDetailPage() {
                     itemId: item.itemId, name: item.name, category: item.category,
                     level: item.level, skill: item.skill, stackSize: item.stackSize,
                     iconPath: item.iconPath, isRare: item.isRare, isExclusive: item.isExclusive,
-                    isAuctionable: item.isAuctionable,
+                    isNoAuction: item.isNoAuction,
                     damage: item.damage, delay: item.delay, def: item.def,
                     hp: item.hp, mp: item.mp,
                     str: item.str, dex: item.dex, vit: item.vit, agi: item.agi,
@@ -139,6 +139,12 @@ export default function ItemDetailPage() {
               )
             )}
           </div>
+          </div>
+        </div>
+
+        {/* In-game style item preview */}
+        <div className="shrink-0 hidden lg:block">
+          <ItemPreviewBox item={item} />
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X, ChevronUp, ChevronDown } from 'lucide-react'
 import { useCompare } from './CompareContext'
 import CompareTable from './CompareTable'
+import { itemImageUrl } from '../../utils/imageUrl'
 
 export default function CompareTray() {
   const { items, removeItem, clearItems, details, fetchDetails } = useCompare()
@@ -37,7 +38,7 @@ export default function CompareTray() {
             {items.map(item => (
               <div key={item.itemId} className="flex items-center gap-1.5 bg-gray-800 border border-gray-700 rounded px-2 py-1 shrink-0">
                 {item.iconPath ? (
-                  <img src={`/item-images/${item.iconPath}`} alt="" className="h-5 w-5" />
+                  <img src={itemImageUrl(item.iconPath)} alt="" className="h-5 w-5" />
                 ) : (
                   <div className="h-5 w-5 rounded bg-gray-700" />
                 )}

@@ -137,9 +137,9 @@ public class ItemsController : ControllerBase
                 i.Skill,
                 i.StackSize,
                 i.IconPath,
-                IsRare = (i.Flags & 32) != 0,
-                IsExclusive = (i.Flags & 8192) != 0,
-                IsAuctionable = (i.Flags & 32768) != 0,
+                IsRare = (i.Flags & 0x8000) != 0,
+                IsExclusive = (i.Flags & 0x4000) != 0,
+                IsNoAuction = (i.Flags & 0x0040) != 0,
                 // Stats for table view
                 i.Damage, i.Delay, i.DEF,
                 i.HP, i.MP,
@@ -194,7 +194,7 @@ public class ItemsController : ControllerBase
             item.PreviewImagePath,
             IsRare = item.IsRare,
             IsExclusive = item.IsExclusive,
-            IsAuctionable = item.IsAuctionable,
+            IsNoAuction = item.IsNoAuction,
         });
     }
 
@@ -370,9 +370,11 @@ public class ItemsController : ControllerBase
 
     private static readonly Dictionary<string, int> FlagBitmasks = new(StringComparer.OrdinalIgnoreCase)
     {
-        ["rare"] = 32,
-        ["exclusive"] = 8192,
-        ["auctionable"] = 32768,
+        ["rare"] = 0x8000,
+        ["exclusive"] = 0x4000,
+        ["noauction"] = 0x0040,
+        ["nosale"] = 0x1000,
+        ["inscribable"] = 0x0020,
     };
 
     private static Expression<Func<GameItem, bool>> BuildStatFilter(

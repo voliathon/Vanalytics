@@ -71,7 +71,8 @@ builder.Services.AddKeyedSingleton<ISyncProvider, ItemSyncProvider>("items");
 builder.Services.AddKeyedSingleton<ISyncProvider, IconSyncProvider>("icons");
 
 builder.Services.AddHostedService<ServerStatusScraper>();
-builder.Services.AddHostedService<ItemDatabaseSyncJob>();
+// ItemDatabaseSyncJob removed — item data is static game data that only changes
+// when SE patches the game. Sync should only be triggered by an admin from /admin/data.
 builder.Services.AddHostedService<BazaarStalenessJob>();
 
 var app = builder.Build();
@@ -106,15 +107,26 @@ if (!app.Environment.IsDevelopment() &&
     app.UseHttpsRedirection();
 }
 
-// Serve item images as static files
-var itemImagesPath = app.Configuration["ItemImages:BasePath"]
-    ?? Path.Combine(AppContext.BaseDirectory, "item-images");
-Directory.CreateDirectory(itemImagesPath);
-app.UseStaticFiles(new StaticFileOptions
+// Serve item images — redirect to Azure blob URL or serve from local disk
+var azureImageStore = app.Services.GetService<IItemImageStore>() as AzureBlobItemImageStore;
+if (azureImageStore != null)
 {
-    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(itemImagesPath),
-    RequestPath = "/item-images"
-});
+    // Azure: redirect /item-images/{path} to the public blob URL
+    app.MapGet("/item-images/{**path}", (string path) =>
+        Results.Redirect($"{azureImageStore.BaseUrl}/{path}", permanent: false));
+}
+else
+{
+    // Local: serve from filesystem
+    var itemImagesPath = app.Configuration["ItemImages:BasePath"]
+        ?? Path.Combine(AppContext.BaseDirectory, "item-images");
+    Directory.CreateDirectory(itemImagesPath);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(itemImagesPath),
+        RequestPath = "/item-images"
+    });
+}
 
 // Serve the embedded SPA (Vanalytics.Web built into wwwroot/)
 app.UseStaticFiles();

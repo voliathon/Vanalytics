@@ -71,6 +71,12 @@ public class AdminSyncController : ControllerBase
             return;
         }
 
+        // Send the last known progress immediately so late-connecting clients see current state
+        if (job.LastEvent is not null)
+        {
+            await WriteEventAsync(job.LastEvent, ct);
+        }
+
         var reader = job.Channel.Reader;
 
         try
@@ -84,6 +90,17 @@ public class AdminSyncController : ControllerBase
         {
             // Client disconnected
         }
+    }
+
+    /// <summary>Returns the last progress event for a running sync. Used for polling when reconnecting mid-sync.</summary>
+    [HttpGet("{providerId}/current")]
+    public IActionResult CurrentProgress(string providerId)
+    {
+        var job = _orchestrator.GetJob(providerId);
+        if (job?.LastEvent is null)
+            return NotFound();
+
+        return new JsonResult(job.LastEvent, JsonOptions);
     }
 
     [HttpGet("status")]

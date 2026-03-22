@@ -23,6 +23,8 @@ public class GameItemConfiguration : IEntityTypeConfiguration<GameItem>
         builder.Property(i => i.PreviewImagePath).HasMaxLength(256);
         builder.Ignore(i => i.IsRare);
         builder.Ignore(i => i.IsExclusive);
-        builder.Ignore(i => i.IsAuctionable);
+        builder.Ignore(i => i.IsNoAuction);
+        builder.Ignore(i => i.IsNoSale);
+        builder.Ignore(i => i.IsInscribable);
     }
 }

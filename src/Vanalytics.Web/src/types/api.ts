@@ -131,7 +131,7 @@ export interface GameItemSummary {
   iconPath: string | null
   isRare: boolean
   isExclusive: boolean
-  isAuctionable: boolean
+  isNoAuction: boolean
   // Stats (included for table view / sorting)
   damage: number | null
   delay: number | null
@@ -207,7 +207,7 @@ export interface GameItemDetail {
   previewImagePath: string | null
   isRare: boolean
   isExclusive: boolean
-  isAuctionable: boolean
+  isNoAuction: boolean
 }
 
 export interface ItemSearchResult {

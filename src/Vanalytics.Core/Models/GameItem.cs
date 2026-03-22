@@ -47,7 +47,12 @@ public class GameItem
     public string? PreviewImagePath { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
-    public bool IsRare => (Flags & 32) != 0;
-    public bool IsExclusive => (Flags & 8192) != 0;
-    public bool IsAuctionable => (Flags & 32768) != 0;
+    // FFXI item flags bitmask (from LandSandBoat/Windower):
+    // 0x0020 = Inscribable, 0x0040 = NoAuction, 0x1000 = NoSale,
+    // 0x2000 = NoDelivery, 0x4000 = Exclusive, 0x8000 = Rare
+    public bool IsRare => (Flags & 0x8000) != 0;
+    public bool IsExclusive => (Flags & 0x4000) != 0;
+    public bool IsNoAuction => (Flags & 0x0040) != 0;
+    public bool IsNoSale => (Flags & 0x1000) != 0;
+    public bool IsInscribable => (Flags & 0x0020) != 0;
 }
