@@ -1,3 +1,10 @@
+FROM node:22-alpine AS frontend
+WORKDIR /app
+COPY src/Vanalytics.Web/package.json src/Vanalytics.Web/package-lock.json ./
+RUN npm ci
+COPY src/Vanalytics.Web/ ./
+RUN npm run build
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 EXPOSE 8080
@@ -16,4 +23,5 @@ RUN dotnet publish "src/Vanalytics.Api/Vanalytics.Api.csproj" -c Release -o /app
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
+COPY --from=frontend /app/dist/ ./wwwroot/
 ENTRYPOINT ["dotnet", "Vanalytics.Api.dll"]

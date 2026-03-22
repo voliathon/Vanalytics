@@ -109,13 +109,14 @@ if (!app.Environment.IsDevelopment() &&
 var itemImagesPath = app.Configuration["ItemImages:BasePath"]
     ?? Path.Combine(AppContext.BaseDirectory, "item-images");
 Directory.CreateDirectory(itemImagesPath);
+app.UseStaticFiles(new StaticFileOptions
 {
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(itemImagesPath),
-        RequestPath = "/item-images"
-    });
-}
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(itemImagesPath),
+    RequestPath = "/item-images"
+});
+
+// Serve the embedded SPA (Vanalytics.Web built into wwwroot/)
+app.UseStaticFiles();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -126,6 +127,9 @@ app.MapScalarApiReference("/api/docs", options =>
 });
 app.MapControllers();
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
+
+// SPA fallback: serve index.html for unmatched non-file, non-API requests
+app.MapFallbackToFile("index.html");
 
 app.Run();
 
