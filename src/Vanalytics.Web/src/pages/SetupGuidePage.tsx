@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { Download } from 'lucide-react'
 
 function Step({ number, title, children }: { number: number; title: string; children: React.ReactNode }) {
   return (
@@ -87,16 +88,20 @@ export default function SetupGuidePage() {
 
         <Step number={4} title="Install the Vanalytics Addon">
           <p>
-            Copy the <code className="text-blue-300 bg-gray-800 px-1.5 py-0.5 rounded">vanalytics</code> addon
-            folder into your Windower addons directory:
+            Download the addon and extract the <code className="text-blue-300 bg-gray-800 px-1.5 py-0.5 rounded">vanalytics</code> folder
+            into your Windower addons directory:
           </p>
           <CodeBlock>{`Windower4\\addons\\vanalytics\\
 ├── vanalytics.lua
 └── settings.xml`}</CodeBlock>
-          <p>
-            The addon files can be downloaded from the Vana'lytics repository or provided by your
-            server administrator.
-          </p>
+          <a
+            href="/api/addon/download"
+            download
+            className="inline-flex items-center gap-2 rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            Download Addon (.zip)
+          </a>
         </Step>
 
         <Step number={5} title="Configure Your API Key">
@@ -209,6 +214,14 @@ export default function SetupGuidePage() {
               <dd className="text-gray-500 mt-1">
                 The API allows a maximum of 20 sync requests per hour. Increase your sync interval
                 or wait for the limit to reset.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-gray-300">Brief game freeze during sync</dt>
+              <dd className="text-gray-500 mt-1">
+                The addon uses a synchronous HTTP request to send data, which may cause a
+                momentary freeze (less than a second) each time it syncs. This is normal and
+                only happens once every sync interval (default: 15 minutes).
               </dd>
             </div>
             <div>
