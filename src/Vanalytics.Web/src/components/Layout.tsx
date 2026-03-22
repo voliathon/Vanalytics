@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext'
 import UserAvatar from './UserAvatar'
 import LoginModal from './LoginModal'
 import { LayoutDashboard, Swords, Menu, ShieldCheck, Users, BookOpen, Radio, Package, Store, Database, LogIn, Clock } from 'lucide-react'
+import { CompareProvider } from './compare/CompareContext'
+import CompareTray from './compare/CompareTray'
 
 function SidebarLink({ to, label, icon }: { to: string; label: string; icon: ReactNode }) {
   return (
@@ -46,6 +48,7 @@ export default function Layout() {
   }
 
   return (
+    <CompareProvider>
     <div className="min-h-screen bg-gray-950 text-gray-100 flex">
       {/* Mobile overlay */}
       {sidebarOpen && (
@@ -94,7 +97,7 @@ export default function Layout() {
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-600">Admin</span>
               </div>
               <SidebarLink to="/admin/users" label="Users" icon={<Users className="h-4 w-4 shrink-0" />} />
-              <SidebarLink to="/admin/items" label="Item Database" icon={<Database className="h-4 w-4 shrink-0" />} />
+              <SidebarLink to="/admin/data" label="Data" icon={<Database className="h-4 w-4 shrink-0" />} />
             </>
           )}
         </nav>
@@ -146,15 +149,16 @@ export default function Layout() {
           </Link>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-6 lg:p-8 pb-16">
           <div className="mx-auto max-w-5xl">
             <Outlet />
           </div>
         </main>
       </div>
 
-      {/* Login modal */}
-      {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
     </div>
+    <CompareTray />
+    {loginOpen && <LoginModal onClose={() => setLoginOpen(false)} />}
+    </CompareProvider>
   )
 }

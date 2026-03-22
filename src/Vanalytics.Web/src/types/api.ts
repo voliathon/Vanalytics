@@ -132,6 +132,33 @@ export interface GameItemSummary {
   isRare: boolean
   isExclusive: boolean
   isAuctionable: boolean
+  // Stats (included for table view / sorting)
+  damage: number | null
+  delay: number | null
+  def: number | null
+  hp: number | null
+  mp: number | null
+  str: number | null
+  dex: number | null
+  vit: number | null
+  agi: number | null
+  int: number | null
+  mnd: number | null
+  chr: number | null
+  accuracy: number | null
+  attack: number | null
+  rangedAccuracy: number | null
+  rangedAttack: number | null
+  magicAccuracy: number | null
+  magicDamage: number | null
+  magicEvasion: number | null
+  evasion: number | null
+  enmity: number | null
+  haste: number | null
+  storeTP: number | null
+  tpBonus: number | null
+  physicalDamageTaken: number | null
+  magicDamageTaken: number | null
 }
 
 export interface GameItemDetail {
@@ -304,4 +331,11 @@ export interface BazaarListingItem {
   zone: string
   lastSeenAt: string
   serverName: string
+}
+
+// Stat filtering
+export interface StatFilter {
+  stat: string
+  min: string
+  max: string
 }

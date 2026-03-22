@@ -60,7 +60,7 @@ export default function App() {
               element={<ProtectedRoute><AdminUsersPage /></ProtectedRoute>}
             />
             <Route
-              path="/admin/items"
+              path="/admin/data"
               element={<ProtectedRoute><AdminItemsPage /></ProtectedRoute>}
             />
           </Route>

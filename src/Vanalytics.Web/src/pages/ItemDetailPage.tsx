@@ -7,6 +7,7 @@ import PriceHistoryChart from '../components/economy/PriceHistoryChart'
 import CrossServerChart from '../components/economy/CrossServerChart'
 import SalesTable from '../components/economy/SalesTable'
 import BazaarListingsTable from '../components/economy/BazaarListingsTable'
+import { useCompare } from '../components/compare/CompareContext'
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -19,6 +20,7 @@ export default function ItemDetailPage() {
   const [salesPage, setSalesPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [bazaarListings, setBazaarListings] = useState<BazaarListingItem[]>([])
+  const { addItem, removeItem, isSelected, isFull } = useCompare()
 
   // Load item detail
   useEffect(() => {
@@ -99,6 +101,43 @@ export default function ItemDetailPage() {
             {item.isExclusive && <span className="text-xs text-red-400">Ex</span>}
             {item.isAuctionable && <span className="text-xs text-green-400">AH</span>}
             <span className="text-xs text-gray-600">Stack: {item.stackSize}</span>
+          </div>
+          {/* Compare button */}
+          <div className="mt-2">
+            {item && (
+              isSelected(item.itemId) ? (
+                <button
+                  onClick={() => removeItem(item.itemId)}
+                  className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-500 transition-colors"
+                >
+                  Remove from Compare
+                </button>
+              ) : (
+                <button
+                  onClick={() => addItem({
+                    itemId: item.itemId, name: item.name, category: item.category,
+                    level: item.level, skill: item.skill, stackSize: item.stackSize,
+                    iconPath: item.iconPath, isRare: item.isRare, isExclusive: item.isExclusive,
+                    isAuctionable: item.isAuctionable,
+                    damage: item.damage, delay: item.delay, def: item.def,
+                    hp: item.hp, mp: item.mp,
+                    str: item.str, dex: item.dex, vit: item.vit, agi: item.agi,
+                    int: item.int, mnd: item.mnd, chr: item.chr,
+                    accuracy: item.accuracy, attack: item.attack,
+                    rangedAccuracy: item.rangedAccuracy, rangedAttack: item.rangedAttack,
+                    magicAccuracy: item.magicAccuracy, magicDamage: item.magicDamage,
+                    magicEvasion: item.magicEvasion, evasion: item.evasion,
+                    enmity: item.enmity, haste: item.haste,
+                    storeTP: item.storeTP, tpBonus: item.tpBonus,
+                    physicalDamageTaken: item.physicalDamageTaken, magicDamageTaken: item.magicDamageTaken,
+                  })}
+                  disabled={isFull}
+                  className="rounded bg-gray-700 px-3 py-1 text-xs font-medium text-gray-300 hover:bg-gray-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Add to Compare
+                </button>
+              )
+            )}
           </div>
         </div>
       </div>

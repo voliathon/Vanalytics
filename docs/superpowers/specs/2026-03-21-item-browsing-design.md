@@ -22,9 +22,9 @@ Valid stat names (match GameItem property names):
 
 Invalid stat names return 400 Bad Request.
 
-**`slots` (string, optional)** — Equipment slot filter. Accepts slot names: `Main`, `Sub`, `Range`, `Ammo`, `Head`, `Body`, `Hands`, `Legs`, `Feet`, `Neck`, `Waist`, `EarL`, `EarR`, `RingL`, `RingR`, `Back`. Maps to the `Slots` bitmask field on GameItem.
+**`slots` (string, optional)** — Comma-separated equipment slot filter. Accepts slot names: `Main`, `Sub`, `Range`, `Ammo`, `Head`, `Body`, `Hands`, `Legs`, `Feet`, `Neck`, `Waist`, `Ear`, `Ring`, `Back`. Multiple values are OR'd together. Compound slots: `Ear` maps to bitmask OR of EarL + EarR slots; `Ring` maps to bitmask OR of RingL + RingR slots. This means selecting "Ear" in the Armor subcategory matches items equippable in either ear slot.
 
-**`flags` (string, optional)** — Comma-separated item flag filter: `rare`, `exclusive`, `auctionable`. Filters against the `Flags` bitmask field.
+**`flags` (string, optional)** — Comma-separated item flag filter: `rare`, `exclusive`, `auctionable`. Filters against the `Flags` bitmask field (Rare=32, Exclusive=8192, Auctionable=32768).
 
 ### 1.2 Implementation
 
@@ -54,7 +54,7 @@ Replace the flat category dropdown with a collapsible accordion tree. Top-level 
 | Category | Subcategory Source | Subcategory Values |
 |----------|-------------------|-------------------|
 | Weapon | `skill` field | Hand-to-Hand (1), Dagger (2), Sword (3), Great Sword (4), Axe (5), Great Axe (6), Scythe (7), Polearm (8), Katana (9), Great Katana (10), Club (11), Staff (12), Archery (25), Marksmanship (26) |
-| Armor | `slots` field | Head, Body, Hands, Legs, Feet, Back, Waist, Neck, Ear, Ring |
+| Armor | `slots` field | Head, Body, Hands, Legs, Feet, Back, Waist, Neck, Ear (EarL+EarR), Ring (RingL+RingR) |
 | General | none | — |
 | Furnishing | none | — |
 | Crystal | none | — |
@@ -64,7 +64,7 @@ Replace the flat category dropdown with a collapsible accordion tree. Top-level 
 - Clicking a top-level category sets the `category` API param and clears any subcategory filter
 - Expanding a category reveals its subcategories
 - Clicking a subcategory sets both `category` and the relevant param (`skill` for Weapon, `slots` for Armor)
-- Item counts shown next to each category/subcategory (fetched from current result metadata or a lightweight count endpoint — implementation can decide)
+- Item counts next to categories are deferred (not MVP) — can be added later via a lightweight count endpoint
 - Only one category can be active at a time
 - A "Clear" action deselects the current category
 
