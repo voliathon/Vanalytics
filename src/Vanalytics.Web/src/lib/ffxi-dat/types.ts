@@ -31,3 +31,23 @@ export interface ParsedDatFile {
   textures: ParsedTexture[]
   skeleton: ParsedSkeleton | null
 }
+
+export interface ParsedZoneMesh {
+  vertices: number[]      // flat xyz (3 floats per vertex)
+  normals: number[]       // flat xyz (3 floats per vertex)
+  colors: number[]        // flat rgba 0.0-1.0 (4 floats per vertex)
+  uvs: number[]           // flat uv (2 floats per vertex)
+  indices: number[]       // triangle indices
+  materialIndex: number   // texture index (sequential IMG block order)
+}
+
+export interface ZoneMeshInstance {
+  meshIndex: number       // which MMB prefab (sequential MMB block order)
+  transform: number[]     // 4x4 matrix (16 floats, row-major)
+}
+
+export interface ParsedZone {
+  prefabs: ParsedZoneMesh[]       // unique MMB mesh prefabs
+  instances: ZoneMeshInstance[]    // MZB placement transforms
+  textures: ParsedTexture[]       // reused from entity pipeline
+}

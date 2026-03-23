@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { LoginModalProvider, useLoginModal } from '../context/LoginModalContext'
 import UserAvatar from './UserAvatar'
 import LoginModal from './LoginModal'
-import { LayoutDashboard, Swords, Menu, ShieldCheck, Users, BookOpen, Radio, Package, Store, Database, Clock, KeyRound, Bug, ChevronRight } from 'lucide-react'
+import { LayoutDashboard, Swords, Menu, ShieldCheck, Users, BookOpen, Radio, Package, Store, Database, Clock, KeyRound, Bug, ChevronRight, Map } from 'lucide-react'
 import { CompareProvider } from './compare/CompareContext'
 import CompareTray from './compare/CompareTray'
 import { SyncProvider } from '../context/SyncContext'
@@ -14,7 +14,7 @@ import { FfxiFileSystemProvider } from '../context/FfxiFileSystemContext'
 type SectionName = 'database' | 'economy' | 'server' | 'admin'
 
 function getSection(pathname: string): SectionName | null {
-  if (pathname.startsWith('/items') || pathname.startsWith('/npcs')) return 'database'
+  if (pathname.startsWith('/items') || pathname.startsWith('/npcs') || pathname.startsWith('/zones')) return 'database'
   if (pathname.startsWith('/bazaar')) return 'economy'
   if (pathname.startsWith('/servers') || pathname.startsWith('/clock')) return 'server'
   if (pathname.startsWith('/admin')) return 'admin'
@@ -153,6 +153,7 @@ function LayoutInner() {
           <SidebarSection label="Database" icon={<Database className="h-4 w-4 shrink-0" />} isOpen={openSection === 'database'} onToggle={() => toggleSection('database')}>
             <SidebarLink to="/items" end={false} label="Items" icon={<Package className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
             <SidebarLink to="/npcs" label="NPCs" icon={<Bug className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
+            <SidebarLink to="/zones" label="Zone Viewer" icon={<Map className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
           </SidebarSection>
 
           <SidebarSection label="Economy" icon={<Store className="h-4 w-4 shrink-0" />} isOpen={openSection === 'economy'} onToggle={() => toggleSection('economy')}>

@@ -22,6 +22,7 @@ import VanadielClockPage from './pages/VanadielClockPage'
 import PublicProfilePage from './pages/PublicProfilePage'
 import ModelDebugPage from './pages/ModelDebugPage'
 import NpcBrowserPage from './pages/NpcBrowserPage'
+import ZoneBrowserPage from './pages/ZoneBrowserPage'
 
 function SamlCodeHandler() {
   const { samlExchange } = useAuth()
@@ -108,6 +109,7 @@ export default function App() {
             <Route path="/admin/data" element={<ProtectedRoute><AdminItemsPage /></ProtectedRoute>} />
             <Route path="/admin/saml" element={<ProtectedRoute><AdminSamlPage /></ProtectedRoute>} />
             <Route path="/npcs" element={<ProtectedRoute><NpcBrowserPage /></ProtectedRoute>} />
+            <Route path="/zones" element={<ProtectedRoute><ZoneBrowserPage /></ProtectedRoute>} />
             <Route path="/debug/models" element={<ProtectedRoute><ModelDebugPage /></ProtectedRoute>} />
           </Route>
         </Routes>
