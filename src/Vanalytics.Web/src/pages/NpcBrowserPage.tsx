@@ -1,129 +1,97 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useFfxiFileSystem } from '../context/FfxiFileSystemContext'
-import { parseDatFile, FileTableResolver } from '../lib/ffxi-dat'
+import { parseDatFile } from '../lib/ffxi-dat'
 import type { ParsedMesh, ParsedTexture } from '../lib/ffxi-dat'
 import ThreeModelViewer from '../components/character/ThreeModelViewer'
-import { api } from '../api/client'
-import { Search, ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Search, X, Shuffle, ChevronRight, Clock } from 'lucide-react'
 
-interface NpcEntry {
-  poolId: number
+interface NpcModel {
   name: string
-  familyId: number
-  modelId: number
-  isMonster: boolean
-  modelData: string
+  category: string
+  path: string
 }
 
-interface NpcSearchResult {
-  totalCount: number
-  page: number
-  pageSize: number
-  items: NpcEntry[]
-}
+const MAX_RECENT = 8
 
 export default function NpcBrowserPage() {
   const ffxi = useFfxiFileSystem()
+  const [allModels, setAllModels] = useState<NpcModel[]>([])
   const [query, setQuery] = useState('')
-  const [monstersOnly, setMonstersOnly] = useState(true)
-  const [results, setResults] = useState<NpcEntry[]>([])
-  const [totalCount, setTotalCount] = useState(0)
-  const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [selected, setSelected] = useState<NpcEntry | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [selected, setSelected] = useState<NpcModel | null>(null)
   const [meshData, setMeshData] = useState<{ meshes: ParsedMesh[]; textures: ParsedTexture[] } | null>(null)
   const [modelLoading, setModelLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'3d' | 'wireframe'>('3d')
   const [lighting, setLighting] = useState<'standard' | 'enhanced'>('standard')
   const [parseLog, setParseLog] = useState<string[]>([])
-  const [resolver, setResolver] = useState<FileTableResolver | null>(null)
-  const [resolverError, setResolverError] = useState('')
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [browserOpen, setBrowserOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(true)
+  const [recent, setRecent] = useState<NpcModel[]>([])
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const pageSize = 50
 
   const log = (msg: string) => setParseLog(prev => [...prev, msg])
 
-  // Load FileTableResolver once when authorized
+  // Load static NPC model data
   useEffect(() => {
-    if (!ffxi.isAuthorized) return
-    FileTableResolver.fromDirectory(ffxi.readFile)
-      .then(r => {
-        setResolver(r)
-        setResolverError('')
-      })
-      .catch(() => setResolverError('Failed to load VTABLE/FTABLE from FFXI installation.'))
-  }, [ffxi.isAuthorized, ffxi.readFile])
+    fetch('/data/npc-model-paths.json')
+      .then(r => r.json())
+      .then((data: NpcModel[]) => setAllModels(data))
+      .catch(() => setAllModels([]))
+  }, [])
 
-  // Search NPCs from API
-  const search = useCallback(async (p: number) => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (query) params.set('q', query)
-      if (monstersOnly) params.set('monsters', 'true')
-      params.set('page', String(p))
-      params.set('pageSize', String(pageSize))
-      const data = await api<NpcSearchResult>(`/api/npcs?${params}`)
-      setResults(data.items)
-      setTotalCount(data.totalCount)
-      setPage(p)
-    } catch {
-      setResults([])
-      setTotalCount(0)
-    } finally {
-      setLoading(false)
+  // Derive categories with counts
+  const categoryStats = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const m of allModels) counts.set(m.category, (counts.get(m.category) ?? 0) + 1)
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [allModels])
+
+  // Filter models
+  const filtered = useMemo(() => {
+    let list = allModels
+    if (selectedCategory) list = list.filter(m => m.category === selectedCategory)
+    if (query) {
+      const q = query.toLowerCase()
+      list = list.filter(m => m.name.toLowerCase().includes(q))
     }
-  }, [query, monstersOnly])
+    return list
+  }, [allModels, query, selectedCategory])
 
-  // Initial load
-  useEffect(() => { search(1) }, [search])
-
-  // Focus search when picker opens
+  // Focus search when browser opens
   useEffect(() => {
-    if (pickerOpen) searchRef.current?.focus()
-  }, [pickerOpen])
+    if (browserOpen) searchRef.current?.focus()
+  }, [browserOpen])
 
-  // Load NPC model DAT
-  const loadModel = async (npc: NpcEntry) => {
+  // Load NPC model
+  const loadModel = useCallback(async (npc: NpcModel) => {
     setSelected(npc)
-    setPickerOpen(false)
+    setBrowserOpen(false)
     setMeshData(null)
     setParseLog([])
     setLogOpen(true)
     setModelLoading(true)
 
+    // Add to recent (dedupe by path)
+    setRecent(prev => {
+      const filtered = prev.filter(r => r.path !== npc.path)
+      return [npc, ...filtered].slice(0, MAX_RECENT)
+    })
+
     try {
-      log(`NPC: ${npc.name} (Pool ${npc.poolId}, Family ${npc.familyId})`)
-      log(`ModelData: ${npc.modelData}`)
-      log(`IsMonster: ${npc.isMonster}, ModelId (slot1): ${npc.modelId}`)
-
-      if (!resolver) {
-        log('ERROR: FileTableResolver not loaded — configure your FFXI installation first.')
-        return
-      }
-
-      log(`VTABLE/FTABLE loaded (${resolver.fileCount} entries)`)
-
-      const romPath = resolver.resolveFileId(npc.modelId)
-      if (!romPath) {
-        log(`VTABLE lookup failed: file ID ${npc.modelId} not found (VTABLE returned 0 or out of range)`)
-        log('This model ID may not have a corresponding DAT in your installation.')
-        return
-      }
-
-      log(`Resolved: file ID ${npc.modelId} → ${romPath}`)
+      log(`NPC: ${npc.name} (${npc.category})`)
+      log(`DAT: ${npc.path}`)
 
       let buffer: ArrayBuffer
       try {
-        buffer = await ffxi.readFile(romPath)
+        buffer = await ffxi.readFile(npc.path)
       } catch (readErr) {
-        log(`File read failed: ${romPath} — ${readErr instanceof Error ? readErr.message : String(readErr)}`)
+        log(`File read failed: ${npc.path} — ${readErr instanceof Error ? readErr.message : String(readErr)}`)
         return
       }
-      log(`Read ${buffer.byteLength} bytes from ${romPath}`)
+      log(`Read ${buffer.byteLength} bytes`)
 
       if (buffer.byteLength < 16) {
         log(`File too small (${buffer.byteLength} bytes) — not a valid DAT`)
@@ -152,7 +120,16 @@ export default function NpcBrowserPage() {
     } finally {
       setModelLoading(false)
     }
-  }
+  }, [ffxi.readFile])
+
+  // Random model
+  const loadRandom = useCallback(() => {
+    if (allModels.length === 0) return
+    const pool = selectedCategory ? allModels.filter(m => m.category === selectedCategory) : allModels
+    if (pool.length === 0) return
+    const pick = pool[Math.floor(Math.random() * pool.length)]
+    loadModel(pick)
+  }, [allModels, selectedCategory, loadModel])
 
   // Wireframe renderer
   useEffect(() => {
@@ -202,12 +179,10 @@ export default function NpcBrowserPage() {
     ctx.fillText(`${totalVerts} verts, ${Math.floor(totalVerts / 3)} tris`, 8, h - 8)
   }, [meshData, viewMode])
 
-  const totalPages = Math.ceil(totalCount / pageSize)
-
-  // Not configured states — centered in the full-bleed area
+  // ── Not configured states ──
   if (!ffxi.isSupported) {
     return (
-      <div className="-m-6 lg:-m-8 -mb-16 flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="fixed inset-0 lg:left-64 z-10 bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">NPC / Monster Models</h1>
           <p className="text-gray-400">This feature requires a Chromium-based browser (Chrome, Edge, Brave).</p>
@@ -218,7 +193,7 @@ export default function NpcBrowserPage() {
 
   if (!ffxi.isConfigured) {
     return (
-      <div className="-m-6 lg:-m-8 -mb-16 flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="fixed inset-0 lg:left-64 z-10 bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">NPC / Monster Models</h1>
           <p className="text-gray-400 mb-4">Configure your FFXI installation directory to view 3D models.</p>
@@ -232,7 +207,7 @@ export default function NpcBrowserPage() {
 
   if (!ffxi.isAuthorized) {
     return (
-      <div className="-m-6 lg:-m-8 -mb-16 flex items-center justify-center h-[calc(100vh-4rem)]">
+      <div className="fixed inset-0 lg:left-64 z-10 bg-gray-950 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">NPC / Monster Models</h1>
           <p className="text-gray-400 mb-4">Re-authorize access to your FFXI installation directory.</p>
@@ -245,11 +220,10 @@ export default function NpcBrowserPage() {
   }
 
   return (
-    // Break out of Layout padding to fill the full content area
-    <div className="-m-6 lg:-m-8 -mb-16 h-[calc(100vh-4rem)] lg:h-screen flex flex-col overflow-hidden">
-      {/* Full-bleed viewport */}
-      <div className="flex-1 relative bg-gray-950 overflow-hidden">
-        {/* ── Model viewport (fills entire area) ── */}
+    // Fixed positioning: fills viewport to the right of the sidebar
+    <div className="fixed inset-0 lg:left-64 z-10 bg-gray-950 overflow-hidden">
+      {/* ── 3D Viewport (fills entire area) ── */}
+      <div className="absolute inset-0">
         {modelLoading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-950/80 z-20">
             <p className="text-sm text-gray-400 animate-pulse">Loading model...</p>
@@ -258,13 +232,22 @@ export default function NpcBrowserPage() {
 
         {!selected && !meshData && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
-            <p className="text-gray-500 text-sm mb-2">Select an NPC to view its 3D model</p>
-            <button
-              onClick={() => setPickerOpen(true)}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm text-white"
-            >
-              Browse NPCs
-            </button>
+            <p className="text-gray-500 mb-3">Explore 3D models from Final Fantasy XI</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setBrowserOpen(true)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-sm text-white"
+              >
+                Browse Models ({allModels.length.toLocaleString()})
+              </button>
+              <button
+                onClick={loadRandom}
+                className="flex items-center gap-1.5 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm text-gray-300"
+              >
+                <Shuffle className="h-3.5 w-3.5" />
+                Random
+              </button>
+            </div>
           </div>
         )}
 
@@ -273,187 +256,254 @@ export default function NpcBrowserPage() {
         )}
 
         {meshData && viewMode === 'wireframe' && (
-          <canvas
-            ref={canvasRef}
-            width={1200}
-            height={900}
-            className="w-full h-full object-contain"
-          />
+          <canvas ref={canvasRef} width={1200} height={900} className="w-full h-full object-contain" />
         )}
+      </div>
 
-        {/* ── Top-left: NPC selector trigger ── */}
-        <div className="absolute top-3 left-3 z-30">
+      {/* ── Top-left: Browse button + recent strip ── */}
+      <div className="absolute top-3 left-3 z-30 flex items-center gap-2">
+        <button
+          onClick={() => setBrowserOpen(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 text-sm text-gray-200 hover:bg-gray-800/90 transition-colors shadow-lg"
+        >
+          <Search className="h-3.5 w-3.5 text-gray-400" />
+          <span className="max-w-[180px] truncate">
+            {selected ? selected.name : 'Browse Models...'}
+          </span>
+        </button>
+
+        <button
+          onClick={loadRandom}
+          title="Load a random model"
+          className="p-2 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-gray-200 hover:bg-gray-800/90 transition-colors shadow-lg"
+        >
+          <Shuffle className="h-3.5 w-3.5" />
+        </button>
+
+        {/* Recent models strip */}
+        {recent.length > 0 && (
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 shadow-lg">
+            <Clock className="h-3 w-3 text-gray-600 shrink-0" />
+            {recent.map((r, i) => (
+              <button
+                key={`${r.path}-${i}`}
+                onClick={() => loadModel(r)}
+                title={r.name}
+                className={`px-1.5 py-0.5 text-[11px] rounded transition-colors max-w-[80px] truncate ${
+                  selected?.path === r.path
+                    ? 'bg-blue-600/50 text-blue-200'
+                    : 'text-gray-500 hover:text-gray-200 hover:bg-gray-800'
+                }`}
+              >
+                {r.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Top-right: view controls ── */}
+      <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5">
+        <div className="flex gap-0.5 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 p-0.5 shadow-lg">
           <button
-            onClick={() => setPickerOpen(!pickerOpen)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 text-sm text-gray-200 hover:bg-gray-800/90 transition-colors shadow-lg"
+            onClick={() => setViewMode('3d')}
+            className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+              viewMode === '3d' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
+            }`}
           >
-            <Search className="h-3.5 w-3.5 text-gray-400" />
-            <span className="max-w-[200px] truncate">
-              {selected ? selected.name : 'Select NPC...'}
-            </span>
-            {pickerOpen ? <ChevronUp className="h-3.5 w-3.5 text-gray-500" /> : <ChevronDown className="h-3.5 w-3.5 text-gray-500" />}
+            3D
           </button>
+          <button
+            onClick={() => setViewMode('wireframe')}
+            className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+              viewMode === 'wireframe' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            Wireframe
+          </button>
+        </div>
+        <button
+          onClick={() => setLighting(l => l === 'standard' ? 'enhanced' : 'standard')}
+          className={`px-2.5 py-1 text-xs rounded-lg border shadow-lg backdrop-blur transition-colors ${
+            lighting === 'enhanced'
+              ? 'bg-amber-600/90 border-amber-500/50 text-white'
+              : 'bg-gray-900/90 border-gray-700/50 text-gray-400 hover:text-gray-200'
+          }`}
+        >
+          Lighting
+        </button>
+      </div>
 
-          {/* ── Dropdown picker panel ── */}
-          {pickerOpen && (
-            <div className="absolute top-full left-0 mt-1 w-80 rounded-lg bg-gray-900/95 backdrop-blur border border-gray-700/50 shadow-2xl overflow-hidden">
-              {/* Search input */}
-              <div className="p-2 border-b border-gray-800">
-                <div className="flex gap-1.5">
+      {/* ── Bottom-left: model info ── */}
+      {selected && (
+        <div className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 shadow-lg">
+          <p className="text-sm font-medium text-gray-200">{selected.name}</p>
+          <p className="text-[10px] text-gray-500">{selected.category} · {selected.path}</p>
+        </div>
+      )}
+
+      {/* ── Bottom-right: parse log ── */}
+      {parseLog.length > 0 && (
+        <div className="absolute bottom-3 right-3 z-30">
+          {logOpen ? (
+            <div className="w-80 rounded-lg bg-gray-900/95 backdrop-blur border border-gray-700/50 shadow-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-gray-800">
+                <span className="text-[11px] text-gray-500 font-medium">Parse Log</span>
+                <button onClick={() => setLogOpen(false)} className="text-gray-500 hover:text-gray-300">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="max-h-40 overflow-y-auto p-2 text-[11px] font-mono text-gray-500 space-y-0.5">
+                {parseLog.map((msg, i) => <div key={i}>{msg}</div>)}
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setLogOpen(true)}
+              className="px-2.5 py-1 text-[11px] rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 text-gray-500 hover:text-gray-300 shadow-lg"
+            >
+              Log ({parseLog.length})
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Full browser overlay ── */}
+      {browserOpen && (
+        <div className="absolute inset-0 z-40 flex">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60" onClick={() => setBrowserOpen(false)} />
+
+          {/* Browser panel */}
+          <div className="relative z-10 flex w-full max-w-3xl m-auto h-[80vh] rounded-xl bg-gray-900 border border-gray-700/50 shadow-2xl overflow-hidden">
+            {/* Left: categories */}
+            <div className="w-48 shrink-0 border-r border-gray-800 flex flex-col bg-gray-900/50">
+              <div className="p-3 border-b border-gray-800">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Categories</p>
+              </div>
+              <div className="flex-1 overflow-y-auto py-1">
+                <button
+                  onClick={() => { setSelectedCategory(null); setQuery('') }}
+                  className={`w-full text-left px-3 py-1.5 text-sm flex items-center justify-between transition-colors ${
+                    !selectedCategory ? 'bg-blue-900/30 text-blue-300' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                  }`}
+                >
+                  <span>All Models</span>
+                  <span className="text-[11px] text-gray-600">{allModels.length}</span>
+                </button>
+                {categoryStats.map(cat => (
+                  <button
+                    key={cat.name}
+                    onClick={() => { setSelectedCategory(cat.name); setQuery('') }}
+                    className={`w-full text-left px-3 py-1.5 text-sm flex items-center justify-between transition-colors ${
+                      selectedCategory === cat.name
+                        ? 'bg-blue-900/30 text-blue-300'
+                        : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'
+                    }`}
+                  >
+                    <span className="truncate mr-2">{cat.name}</span>
+                    <span className="text-[11px] text-gray-600 shrink-0">{cat.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: search + models */}
+            <div className="flex-1 flex flex-col min-w-0">
+              {/* Header */}
+              <div className="p-3 border-b border-gray-800 flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                   <input
                     ref={searchRef}
                     type="text"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && search(1)}
-                    placeholder="Search NPCs..."
-                    className="flex-1 px-2.5 py-1.5 text-sm rounded bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-600"
+                    placeholder={selectedCategory ? `Search ${selectedCategory}...` : 'Search all models...'}
+                    className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-600"
                   />
-                  <button
-                    onClick={() => setPickerOpen(false)}
-                    className="p-1.5 rounded text-gray-500 hover:text-gray-300 hover:bg-gray-800"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
                 </div>
-                <div className="flex items-center justify-between mt-1.5 px-0.5">
-                  <label className="flex items-center gap-1.5 text-[11px] text-gray-500">
-                    <input
-                      type="checkbox"
-                      checked={monstersOnly}
-                      onChange={e => setMonstersOnly(e.target.checked)}
-                      className="rounded"
-                    />
-                    Monsters only
-                  </label>
-                  <span className="text-[11px] text-gray-600">{totalCount.toLocaleString()} results</span>
-                </div>
+                <button
+                  onClick={loadRandom}
+                  title="Load a random model"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 text-sm transition-colors"
+                >
+                  <Shuffle className="h-3.5 w-3.5" />
+                  Random
+                </button>
+                <button
+                  onClick={() => setBrowserOpen(false)}
+                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
 
-              {/* Results list */}
-              <div className="max-h-72 overflow-y-auto">
-                {loading && <p className="p-3 text-xs text-gray-400">Loading...</p>}
-                {!loading && results.length === 0 && (
-                  <p className="p-3 text-xs text-gray-500">No NPCs found. Run Game Data sync first.</p>
-                )}
-                {results.map(npc => (
-                  <button
-                    key={npc.poolId}
-                    onClick={() => loadModel(npc)}
-                    className={`w-full text-left px-3 py-2 text-sm border-b border-gray-800/30 transition-colors ${
-                      selected?.poolId === npc.poolId
-                        ? 'bg-blue-900/40 text-white'
-                        : 'text-gray-300 hover:bg-gray-800/60'
-                    }`}
-                  >
-                    <span className="block truncate text-[13px]">{npc.name}</span>
-                    <span className="text-[10px] text-gray-500">
-                      Family {npc.familyId} · Model {npc.modelId}
-                      {!npc.isMonster && ' · Humanoid'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between px-3 py-2 border-t border-gray-800 text-[11px]">
-                  <button
-                    onClick={() => search(page - 1)}
-                    disabled={page <= 1}
-                    className="px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-30 text-gray-400"
-                  >
-                    Prev
-                  </button>
-                  <span className="text-gray-500">{page} / {totalPages}</span>
-                  <button
-                    onClick={() => search(page + 1)}
-                    disabled={page >= totalPages}
-                    className="px-2 py-0.5 rounded bg-gray-800 hover:bg-gray-700 disabled:opacity-30 text-gray-400"
-                  >
-                    Next
-                  </button>
+              {/* Recent row */}
+              {recent.length > 0 && (
+                <div className="px-3 py-2 border-b border-gray-800/50 flex items-center gap-2">
+                  <Clock className="h-3 w-3 text-gray-600 shrink-0" />
+                  <span className="text-[11px] text-gray-600 shrink-0">Recent:</span>
+                  <div className="flex gap-1 overflow-x-auto">
+                    {recent.map((r, i) => (
+                      <button
+                        key={`${r.path}-${i}`}
+                        onClick={() => loadModel(r)}
+                        className="px-2 py-0.5 text-[11px] rounded bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 whitespace-nowrap transition-colors"
+                      >
+                        {r.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
-            </div>
-          )}
-        </div>
 
-        {/* ── Top-right: view controls ── */}
-        <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5">
-          <div className="flex gap-0.5 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 p-0.5 shadow-lg">
-            <button
-              onClick={() => setViewMode('3d')}
-              className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
-                viewMode === '3d' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              3D
-            </button>
-            <button
-              onClick={() => setViewMode('wireframe')}
-              className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
-                viewMode === 'wireframe' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
-              }`}
-            >
-              Wireframe
-            </button>
-          </div>
-          <button
-            onClick={() => setLighting(l => l === 'standard' ? 'enhanced' : 'standard')}
-            className={`px-2.5 py-1 text-xs rounded-lg border shadow-lg backdrop-blur transition-colors ${
-              lighting === 'enhanced'
-                ? 'bg-amber-600/90 border-amber-500/50 text-white'
-                : 'bg-gray-900/90 border-gray-700/50 text-gray-400 hover:text-gray-200'
-            }`}
-          >
-            Lighting
-          </button>
-        </div>
-
-        {/* ── Bottom-left: model name badge ── */}
-        {selected && (
-          <div className="absolute bottom-3 left-3 z-30 px-3 py-1.5 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 shadow-lg">
-            <p className="text-sm font-medium text-gray-200">{selected.name}</p>
-            <p className="text-[10px] text-gray-500">
-              Pool {selected.poolId} · Family {selected.familyId} · Model {selected.modelId}
-            </p>
-          </div>
-        )}
-
-        {/* ── Bottom-right: parse log toggle ── */}
-        {parseLog.length > 0 && (
-          <div className="absolute bottom-3 right-3 z-30">
-            {logOpen ? (
-              <div className="w-80 rounded-lg bg-gray-900/95 backdrop-blur border border-gray-700/50 shadow-2xl overflow-hidden">
-                <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-gray-800">
-                  <span className="text-[11px] text-gray-500 font-medium">Parse Log</span>
-                  <button onClick={() => setLogOpen(false)} className="text-gray-500 hover:text-gray-300">
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-                <div className="max-h-40 overflow-y-auto p-2 text-[11px] font-mono text-gray-500 space-y-0.5">
-                  {parseLog.map((msg, i) => <div key={i}>{msg}</div>)}
-                </div>
+              {/* Results info */}
+              <div className="px-3 py-1.5 text-[11px] text-gray-600 border-b border-gray-800/30">
+                {filtered.length.toLocaleString()} models
+                {selectedCategory && <span> in {selectedCategory}</span>}
+                {query && <span> matching "{query}"</span>}
               </div>
-            ) : (
-              <button
-                onClick={() => setLogOpen(true)}
-                className="px-2.5 py-1 text-[11px] rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 text-gray-500 hover:text-gray-300 shadow-lg"
-              >
-                Log ({parseLog.length})
-              </button>
-            )}
-          </div>
-        )}
 
-        {/* ── Error banner ── */}
-        {resolverError && (
-          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-lg bg-red-900/80 backdrop-blur border border-red-800/50 text-red-300 text-sm shadow-lg">
-            {resolverError}
+              {/* Model list */}
+              <div className="flex-1 overflow-y-auto">
+                {filtered.length === 0 && (
+                  <div className="p-6 text-center text-sm text-gray-500">
+                    No models found. Try a different search or category.
+                  </div>
+                )}
+                {filtered.slice(0, 300).map((npc, idx) => (
+                  <button
+                    key={`${npc.path}-${idx}`}
+                    onClick={() => loadModel(npc)}
+                    className={`w-full text-left px-3 py-2 flex items-center gap-3 border-b border-gray-800/30 transition-colors group ${
+                      selected?.path === npc.path && selected?.name === npc.name
+                        ? 'bg-blue-900/30'
+                        : 'hover:bg-gray-800/40'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm truncate ${
+                        selected?.path === npc.path && selected?.name === npc.name
+                          ? 'text-blue-300' : 'text-gray-200'
+                      }`}>
+                        {npc.name}
+                      </p>
+                      <p className="text-[11px] text-gray-600 truncate">{npc.path}</p>
+                    </div>
+                    <ChevronRight className="h-3.5 w-3.5 text-gray-700 group-hover:text-gray-500 shrink-0" />
+                  </button>
+                ))}
+                {filtered.length > 300 && (
+                  <p className="p-3 text-[11px] text-gray-600 text-center">
+                    Showing first 300 of {filtered.length.toLocaleString()} — refine your search
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
