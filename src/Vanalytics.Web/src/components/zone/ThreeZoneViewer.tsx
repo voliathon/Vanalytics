@@ -46,8 +46,9 @@ export default function ThreeZoneViewer({ zoneData, lighting = 'standard', camer
       if (tex) {
         const texture = new THREE.DataTexture(new Uint8Array(tex.rgba), tex.width, tex.height, THREE.RGBAFormat)
         texture.needsUpdate = true
-        texture.magFilter = THREE.NearestFilter
-        texture.minFilter = THREE.NearestMipmapLinearFilter
+        texture.magFilter = THREE.LinearFilter
+        texture.minFilter = THREE.LinearMipmapLinearFilter
+        texture.generateMipmaps = true
         texture.flipY = false
         material = new THREE.MeshStandardMaterial({
           map: texture,
@@ -84,7 +85,8 @@ export default function ThreeZoneViewer({ zoneData, lighting = 'standard', camer
     for (const inst of zoneData.instances) {
       const prefab = zoneData.prefabs[inst.meshIndex]
       if (!prefab) continue
-      const x = inst.transform[12], y = inst.transform[13], z = inst.transform[14]
+      // Transform translations — flip Y to match the Math.PI rotation
+      const x = inst.transform[12], y = -inst.transform[13], z = -inst.transform[14]
       bbox.expandByPoint(new THREE.Vector3(x, y, z))
     }
 
@@ -141,20 +143,23 @@ export default function ThreeZoneViewer({ zoneData, lighting = 'standard', camer
         <FlyCamera center={center} size={size} />
       )}
 
-      {instanceData.map((inst, i) => {
-        const geo = geometries[inst.meshIndex]
-        const mat = materials[inst.meshIndex]
-        if (!geo || !mat) return null
-        return (
-          <mesh
-            key={i}
-            geometry={geo}
-            material={mat}
-            matrixAutoUpdate={false}
-            matrix={inst.matrix}
-          />
-        )
-      })}
+      {/* FFXI uses inverted Y — flip with Math.PI rotation like entity viewer */}
+      <group rotation={[Math.PI, 0, 0]}>
+        {instanceData.map((inst, i) => {
+          const geo = geometries[inst.meshIndex]
+          const mat = materials[inst.meshIndex]
+          if (!geo || !mat) return null
+          return (
+            <mesh
+              key={i}
+              geometry={geo}
+              material={mat}
+              matrixAutoUpdate={false}
+              matrix={inst.matrix}
+            />
+          )
+        })}
+      </group>
     </Canvas>
   )
 }

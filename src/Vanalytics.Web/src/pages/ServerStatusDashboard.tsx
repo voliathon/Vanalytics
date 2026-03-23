@@ -7,7 +7,6 @@ import UptimeTrendChart from '../components/server/UptimeTrendChart'
 import ServerHeatmap from '../components/server/ServerHeatmap'
 import ServerRankings from '../components/server/ServerRankings'
 import CurrentStatusGrid from '../components/server/CurrentStatusGrid'
-import RecentIncidents from '../components/server/RecentIncidents'
 import ServerDetailPanel from '../components/server/ServerDetailPanel'
 
 const TIME_RANGES = [
@@ -124,16 +123,10 @@ export default function ServerStatusDashboard() {
         </section>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-          <h2 className="text-xs uppercase text-gray-500 mb-3">Current Status</h2>
-          <CurrentStatusGrid servers={currentServers} onServerClick={handleServerClick} />
-        </section>
-        <section className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-          <h2 className="text-xs uppercase text-gray-500 mb-3">Recent Incidents</h2>
-          <RecentIncidents incidents={data.recentIncidents} />
-        </section>
-      </div>
+      <section className="rounded-lg border border-gray-800 bg-gray-900 p-4">
+        <h2 className="text-xs uppercase text-gray-500 mb-3">Current Status</h2>
+        <CurrentStatusGrid servers={currentServers} onServerClick={handleServerClick} />
+      </section>
       {/* Slide-over panel */}
       {selectedServer && (
         <ServerDetailPanel

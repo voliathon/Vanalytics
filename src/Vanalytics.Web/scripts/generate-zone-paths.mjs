@@ -1,22 +1,20 @@
 /**
- * Generates zone-paths.json with FFXI zone geometry DAT paths.
+ * Generates zone-paths.json with verified FFXI zone geometry DAT paths.
  *
- * Zone geometry DATs contain MZB (0x1C) and MMB (0x2E) blocks.
- * Paths sourced from Codecomp's FFXI zone DAT file locations gist
- * and NavMesh Builder TopazNames.cs zone ID list.
+ * Source: Codecomp's FFXI zone DAT file locations gist (verified paths only).
+ * Format: volume-folder-file → ROM{n}/{folder}/{file}.dat
  *
- * The gist format is "volume-folder-file" where:
- *   volume 1 = ROM/, volume 2 = ROM2/, etc.
- *   Path = ROM{n}/{folder}/{file}.dat
+ * IMPORTANT: Only includes entries from the verified gist. Do NOT guess
+ * additional paths — wrong file IDs load incorrect zone geometry.
  *
  * Run: node scripts/generate-zone-paths.mjs
  * Output: public/data/zone-paths.json
  */
 
-// Zone geometry paths from Codecomp gist (volume-folder-file format)
-// Coordinates are camera start positions (not used here)
+// Verified zone geometry paths from Codecomp gist
+// Format in gist: "volume-folder-file,x,y,z,Name"
 const ZONE_DATA = [
-  // ═══════ Original Areas (from gist: 1-0-* and 1-1-*) ═══════
+  // All from gist (volume 1 = ROM/, folder-file)
   { name: 'Qufim Island', path: 'ROM/0/58.dat', expansion: 'Original' },
   { name: 'Beadeaux', path: 'ROM/0/61.dat', expansion: 'Original' },
   { name: 'Qulun Dome', path: 'ROM/0/62.dat', expansion: 'Original' },
@@ -65,48 +63,12 @@ const ZONE_DATA = [
   { name: 'Port Jeuno', path: 'ROM/1/42.dat', expansion: 'Original' },
   { name: 'Selbina', path: 'ROM/1/43.dat', expansion: 'Original' },
   { name: 'Mhaura', path: 'ROM/1/44.dat', expansion: 'Original' },
-
-  // ═══════ Zones we can infer from FFXI zone IDs + VTABLE patterns ═══════
-  // Additional original zones (following the ROM/0/ and ROM/1/ pattern)
-  { name: 'La Theine Plateau', path: 'ROM/0/122.dat', expansion: 'Original' },
-  { name: 'Jugner Forest', path: 'ROM/0/101.dat', expansion: 'Original' },
-  { name: 'Batallia Downs', path: 'ROM/0/103.dat', expansion: 'Original' },
-  { name: 'Konschtat Highlands', path: 'ROM/0/106.dat', expansion: 'Original' },
-  { name: 'Pashhow Marshlands', path: 'ROM/0/107.dat', expansion: 'Original' },
-  { name: 'Rolanberry Fields', path: 'ROM/0/109.dat', expansion: 'Original' },
-  { name: 'Beaucedine Glacier', path: 'ROM/0/110.dat', expansion: 'Original' },
-  { name: 'Xarcabard', path: 'ROM/0/111.dat', expansion: 'Original' },
-  { name: 'Tahrongi Canyon', path: 'ROM/0/114.dat', expansion: 'Original' },
-  { name: 'Buburimu Peninsula', path: 'ROM/0/115.dat', expansion: 'Original' },
-  { name: 'Meriphataud Mountains', path: 'ROM/0/116.dat', expansion: 'Original' },
-  { name: 'Sauromugue Champaign', path: 'ROM/0/117.dat', expansion: 'Original' },
-  { name: "Behemoth's Dominion", path: 'ROM/0/126.dat', expansion: 'Original' },
-  { name: 'Ranguemont Pass', path: 'ROM/0/118.dat', expansion: 'Original' },
-  { name: "Fei'Yin", path: 'ROM/0/119.dat', expansion: 'Original' },
-  { name: "King Ranperre's Tomb", path: 'ROM/0/89.dat', expansion: 'Original' },
-  { name: 'Dangruf Wadi', path: 'ROM/0/90.dat', expansion: 'Original' },
-  { name: 'Korroloka Tunnel', path: 'ROM/1/9.dat', expansion: 'Original' },
-  { name: 'Kuftal Tunnel', path: 'ROM/1/10.dat', expansion: 'Original' },
-  { name: 'Castle Zvahl Baileys', path: 'ROM/0/66.dat', expansion: 'Original' },
-  { name: 'Yughott Grotto', path: 'ROM/0/96.dat', expansion: 'Original' },
 ]
 
-// Expansion sort order
-const EXPANSION_ORDER = ['Original', 'Zilart', 'Promathia', 'Aht Urhgan', 'Wings of the Goddess', 'Seekers of Adoulin']
+// Sort by name
+ZONE_DATA.sort((a, b) => a.name.localeCompare(b.name))
 
-// Sort by expansion order, then by name
-ZONE_DATA.sort((a, b) => {
-  const ea = EXPANSION_ORDER.indexOf(a.expansion)
-  const eb = EXPANSION_ORDER.indexOf(b.expansion)
-  if (ea !== eb) return ea - eb
-  return a.name.localeCompare(b.name)
-})
-
-console.log(`Total: ${ZONE_DATA.length} zone geometry entries`)
-for (const exp of EXPANSION_ORDER) {
-  const count = ZONE_DATA.filter(z => z.expansion === exp).length
-  if (count > 0) console.log(`  ${exp}: ${count}`)
-}
+console.log(`Total: ${ZONE_DATA.length} verified zone geometry entries`)
 
 const fs = await import('fs')
 const outPath = new URL('../public/data/zone-paths.json', import.meta.url).pathname

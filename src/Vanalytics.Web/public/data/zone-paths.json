@@ -15,23 +15,8 @@
     "expansion": "Original"
   },
   {
-    "name": "Batallia Downs",
-    "path": "ROM/0/103.dat",
-    "expansion": "Original"
-  },
-  {
     "name": "Beadeaux",
     "path": "ROM/0/61.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Beaucedine Glacier",
-    "path": "ROM/0/110.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Behemoth's Dominion",
-    "path": "ROM/0/126.dat",
     "expansion": "Original"
   },
   {
@@ -40,18 +25,8 @@
     "expansion": "Original"
   },
   {
-    "name": "Buburimu Peninsula",
-    "path": "ROM/0/115.dat",
-    "expansion": "Original"
-  },
-  {
     "name": "Castle Oztroja",
     "path": "ROM/0/63.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Castle Zvahl Baileys",
-    "path": "ROM/0/66.dat",
     "expansion": "Original"
   },
   {
@@ -70,11 +45,6 @@
     "expansion": "Original"
   },
   {
-    "name": "Dangruf Wadi",
-    "path": "ROM/0/90.dat",
-    "expansion": "Original"
-  },
-  {
     "name": "Davoi",
     "path": "ROM/0/99.dat",
     "expansion": "Original"
@@ -87,11 +57,6 @@
   {
     "name": "East Sarutabaruta",
     "path": "ROM/1/0.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Fei'Yin",
-    "path": "ROM/0/119.dat",
     "expansion": "Original"
   },
   {
@@ -125,36 +90,6 @@
     "expansion": "Original"
   },
   {
-    "name": "Jugner Forest",
-    "path": "ROM/0/101.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "King Ranperre's Tomb",
-    "path": "ROM/0/89.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Konschtat Highlands",
-    "path": "ROM/0/106.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Korroloka Tunnel",
-    "path": "ROM/1/9.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Kuftal Tunnel",
-    "path": "ROM/1/10.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "La Theine Plateau",
-    "path": "ROM/0/122.dat",
-    "expansion": "Original"
-  },
-  {
     "name": "Lower Jeuno",
     "path": "ROM/1/41.dat",
     "expansion": "Original"
@@ -162,11 +97,6 @@
   {
     "name": "Maze of Shakhrami",
     "path": "ROM/0/75.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Meriphataud Mountains",
-    "path": "ROM/0/116.dat",
     "expansion": "Original"
   },
   {
@@ -205,11 +135,6 @@
     "expansion": "Original"
   },
   {
-    "name": "Pashhow Marshlands",
-    "path": "ROM/0/107.dat",
-    "expansion": "Original"
-  },
-  {
     "name": "Port Bastok",
     "path": "ROM/1/36.dat",
     "expansion": "Original"
@@ -240,23 +165,8 @@
     "expansion": "Original"
   },
   {
-    "name": "Ranguemont Pass",
-    "path": "ROM/0/118.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Rolanberry Fields",
-    "path": "ROM/0/109.dat",
-    "expansion": "Original"
-  },
-  {
     "name": "Ru'Lude Gardens",
     "path": "ROM/1/39.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Sauromugue Champaign",
-    "path": "ROM/0/117.dat",
     "expansion": "Original"
   },
   {
@@ -272,11 +182,6 @@
   {
     "name": "Southern San d'Oria",
     "path": "ROM/1/31.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Tahrongi Canyon",
-    "path": "ROM/0/114.dat",
     "expansion": "Original"
   },
   {
@@ -327,16 +232,6 @@
   {
     "name": "Windurst Woods",
     "path": "ROM/0/81.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Xarcabard",
-    "path": "ROM/0/111.dat",
-    "expansion": "Original"
-  },
-  {
-    "name": "Yughott Grotto",
-    "path": "ROM/0/96.dat",
     "expansion": "Original"
   },
   {

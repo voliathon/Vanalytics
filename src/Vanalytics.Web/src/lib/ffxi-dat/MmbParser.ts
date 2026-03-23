@@ -20,9 +20,13 @@ import { triangleStripToList } from './MeshParser'
  *       Index count (uint32 masked &0xFFFF)
  *       Indices: count × uint16 (+ 2 byte padding if odd)
  */
-export function parseMmbBlock(data: Uint8Array): ParsedZoneMesh[] {
+export interface MmbMeshResult extends ParsedZoneMesh {
+  textureName: string
+}
+
+export function parseMmbBlock(data: Uint8Array): MmbMeshResult[] {
   const reader = new DatReader(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer)
-  const meshes: ParsedZoneMesh[] = []
+  const meshes: MmbMeshResult[] = []
 
   if (data.length < 60) return meshes // SMMBHEAD(16) + SMMBHeader(44) minimum
 
@@ -96,7 +100,7 @@ export function parseMmbBlock(data: Uint8Array): ParsedZoneMesh[] {
       if (reader.remaining < 20) break
 
       // SMMBModelHeader (20 bytes): char textureName[16], u16 vertexsize, u16 blending
-      reader.skip(16) // textureName
+      const textureName = reader.readString(16).trim()
       const vertexCount = reader.readUint16()
       reader.skip(2) // blending
 
@@ -162,6 +166,7 @@ export function parseMmbBlock(data: Uint8Array): ParsedZoneMesh[] {
         uvs,
         indices: triIndices,
         materialIndex: 0,
+        textureName,
       })
     }
   }
