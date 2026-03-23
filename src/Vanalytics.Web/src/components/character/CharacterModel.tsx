@@ -48,8 +48,6 @@ export default function CharacterModel({
           geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertices, 3))
           geometry.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3))
           geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2))
-          geometry.setIndex(new THREE.BufferAttribute(mesh.indices, 1))
-
           let material: THREE.Material
           const tex = parsed!.textures[mesh.materialIndex]
           if (tex) {

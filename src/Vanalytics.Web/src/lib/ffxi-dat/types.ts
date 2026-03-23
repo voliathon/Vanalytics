@@ -22,6 +22,8 @@ export interface ParsedBone {
 
 export interface ParsedSkeleton {
   bones: ParsedBone[]
+  /** Pre-computed world-space 4x4 matrices (row-major, 16 floats each) */
+  matrices: number[][]
 }
 
 export interface ParsedDatFile {
@@ -29,5 +31,3 @@ export interface ParsedDatFile {
   textures: ParsedTexture[]
   skeleton: ParsedSkeleton | null
 }
-
-export const DAT_SIGNATURES = {} as const

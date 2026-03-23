@@ -54,30 +54,30 @@ export class FileTableResolver {
     const folder = ftableValue >> 7
     const file = ftableValue & 0x7F
 
-    // ROM1 = "ROM/", ROM2 = "ROM2/", ROM3 = "ROM3/", etc.
     const romDir = romNum === 1 ? 'ROM' : `ROM${romNum}`
 
     return `${romDir}/${folder}/${file}.dat`
   }
 
-  /** Total number of file IDs in the table */
   get fileCount(): number {
     return this.vtable.length
   }
 }
 
 /**
- * Model-to-DAT-path lookup using AltanaView's CSV data.
+ * Model-to-DAT-path lookup using pre-extracted equipment model data.
  *
- * The data is pre-extracted from https://github.com/mynameisgonz/AltanaView
- * (List/PC/{Race}/{Slot}.csv files) and stored as a static JSON file at
- * /data/model-dat-paths.json.
+ * The mapping data is stored at /data/model-dat-paths.json and covers
+ * all 8 races × 8 equipment slots (~21,000 model→path entries).
  *
- * Structure: { "raceId:slotId": { "modelIndex": "ROM/folder/file.dat", ... } }
+ * For armor (slots 2-6): model IDs are sequential indices matching the
+ * game's internal model numbering.
  *
- * This covers all 8 races × 8 equipment slots = 20,476 model→path mappings.
- * Both armor and weapons are included — weapons have different meshes per race
- * (scaled/rigged for each race's skeleton).
+ * For weapons (slots 7-9): model IDs from the Stylist item-to-model mapping
+ * are matched to ROM paths by item name cross-reference, since weapons are
+ * stored non-contiguously in the ROM.
+ *
+ * Structure: { "raceId:slotId": { "modelId": "ROM/folder/file.dat", ... } }
  */
 
 type ModelDatPaths = Record<string, Record<string, string>>
@@ -92,9 +92,9 @@ async function loadModelDatPaths(): Promise<ModelDatPaths> {
 }
 
 /**
- * Resolve any equipment model to a ROM-relative DAT path.
+ * Resolve an equipment model to a ROM-relative DAT path.
  *
- * @param modelId  - Visual model ID / index (from Stylist data or addon sync)
+ * @param modelId  - Visual model ID (from Stylist data or addon sync)
  * @param raceId   - Windower race ID (1-8)
  * @param slotId   - Equipment slot (2=Head, 3=Body, 4=Hands, 5=Legs, 6=Feet,
  *                   7=Main, 8=Sub, 9=Range)
@@ -112,8 +112,6 @@ export async function modelToPath(
 
 /**
  * Resolve all equipment model IDs to ROM paths in a single batch.
- * More efficient than calling modelToPath() per slot since it loads
- * the JSON once.
  *
  * @param slots - Array of { modelId, raceId, slotId }
  * @returns Map of "raceId:slotId" → ROM path

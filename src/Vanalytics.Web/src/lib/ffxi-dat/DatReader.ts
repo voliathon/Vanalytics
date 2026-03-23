@@ -55,6 +55,6 @@ export class DatReader {
       this.view.byteOffset + offset,
       this.view.byteOffset + offset + length
     )
-    return new DatReader(sliced)
+    return new DatReader(sliced as ArrayBuffer)
   }
 }

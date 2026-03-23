@@ -20,6 +20,7 @@ import ItemDetailPage from './pages/ItemDetailPage'
 import BazaarActivityPage from './pages/BazaarActivityPage'
 import VanadielClockPage from './pages/VanadielClockPage'
 import PublicProfilePage from './pages/PublicProfilePage'
+import ModelDebugPage from './pages/ModelDebugPage'
 
 function SamlCodeHandler() {
   const { samlExchange } = useAuth()
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="/admin/users" element={<ProtectedRoute><AdminUsersPage /></ProtectedRoute>} />
             <Route path="/admin/data" element={<ProtectedRoute><AdminItemsPage /></ProtectedRoute>} />
             <Route path="/admin/saml" element={<ProtectedRoute><AdminSamlPage /></ProtectedRoute>} />
+            <Route path="/debug/models" element={<ProtectedRoute><ModelDebugPage /></ProtectedRoute>} />
           </Route>
         </Routes>
       </AuthProvider>
