@@ -20,6 +20,7 @@ builder.Services.AddSoveranceJwtAuth(builder.Configuration)
 builder.Services.AddSingleton<ISamlSignInHandler, JwtSamlSignInHandler>();
 builder.Services.AddScoped<AuthResponseService>();
 
+builder.Services.AddMemoryCache();
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
@@ -96,8 +97,7 @@ using (var scope = app.Services.CreateScope())
         !string.IsNullOrEmpty(adminUsername) &&
         !string.IsNullOrEmpty(adminPassword))
     {
-        var hash = PasswordHasher.HashPassword(adminPassword);
-        await AdminSeeder.SeedAsync(db, adminEmail, adminUsername, hash, logger);
+        await AdminSeeder.SeedAsync(db, adminEmail, adminUsername, adminPassword, logger);
     }
 
 }
