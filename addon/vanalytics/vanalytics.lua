@@ -41,6 +41,22 @@ local function log_success(msg)
 end
 
 -----------------------------------------------------------------------
+-- HTTP helper: use ssl.https for HTTPS URLs, socket.http for HTTP
+-----------------------------------------------------------------------
+local function http_request(params)
+    local ltn12 = require('ltn12')
+    if params.url and params.url:sub(1, 5) == 'https' then
+        local https = require('ssl.https')
+        https.TIMEOUT = 5
+        return https.request(params)
+    else
+        local http = require('socket.http')
+        http.TIMEOUT = 5
+        return http.request(params)
+    end
+end
+
+-----------------------------------------------------------------------
 -- Equipment slot mapping (Windower slot ID -> API slot name)
 -----------------------------------------------------------------------
 local slot_names = {
@@ -177,36 +193,103 @@ local function read_character_state()
 
     -- All jobs with levels > 0
     local jobs = {}
-    for job_id, level in pairs(player.jobs) do
-        if level > 0 and res.jobs[job_id] then
+    for job_key, level in pairs(player.jobs) do
+        if type(level) == 'number' and level > 0 then
+            local job_abbr = tostring(job_key)
             table.insert(jobs, {
-                job = res.jobs[job_id].ens,
+                job = job_abbr,
                 level = level,
             })
         end
     end
 
     -- Equipped gear
-    -- Windower's get_items().equipment entries have .bag and .slot fields.
-    -- Bag IDs map to bag names: 0=inventory, 8=wardrobe, 10=wardrobe2, etc.
-    -- Access inventory bags via items[bag_id] where bag_id is numeric.
+    -- Windower's get_items().equipment uses string keys matching slot names.
+    local equip_key_map = {
+        [0]  = 'main',
+        [1]  = 'sub',
+        [2]  = 'range',
+        [3]  = 'ammo',
+        [4]  = 'head',
+        [5]  = 'body',
+        [6]  = 'hands',
+        [7]  = 'legs',
+        [8]  = 'feet',
+        [9]  = 'neck',
+        [10] = 'waist',
+        [11] = 'left_ear',
+        [12] = 'right_ear',
+        [13] = 'left_ring',
+        [14] = 'right_ring',
+        [15] = 'back',
+    }
+
+    -- Equipped gear
+    -- Windower equipment fields: slot_name = inventory index, slot_name_bag = bag ID
+    local equip_keys = {
+        [0]  = 'main',
+        [1]  = 'sub',
+        [2]  = 'range',
+        [3]  = 'ammo',
+        [4]  = 'head',
+        [5]  = 'body',
+        [6]  = 'hands',
+        [7]  = 'legs',
+        [8]  = 'feet',
+        [9]  = 'neck',
+        [10] = 'waist',
+        [11] = 'left_ear',
+        [12] = 'right_ear',
+        [13] = 'left_ring',
+        [14] = 'right_ring',
+        [15] = 'back',
+    }
+
     local gear = {}
     local items = windower.ffxi.get_items()
     if items and items.equipment then
+        local equip = items.equipment
+        -- Map numeric bag IDs to items table string keys
+        local bag_names = {
+            [0]  = 'inventory',
+            [1]  = 'safe',
+            [2]  = 'storage',
+            [3]  = 'temporary',
+            [4]  = 'locker',
+            [5]  = 'satchel',
+            [6]  = 'sack',
+            [7]  = 'case',
+            [8]  = 'wardrobe',
+            [9]  = 'safe2',
+            [10] = 'wardrobe2',
+            [11] = 'wardrobe3',
+            [12] = 'wardrobe4',
+            [13] = 'wardrobe5',
+            [14] = 'wardrobe6',
+            [15] = 'wardrobe7',
+            [16] = 'wardrobe8',
+            [17] = 'recycle',
+        }
+
         for slot_id, slot_name in pairs(slot_names) do
-            local equip = items.equipment[slot_id]
-            if equip and equip.slot ~= 0 and equip.slot ~= empty then
-                local bag_table = items[equip.bag]
-                if bag_table then
-                    local item = bag_table[equip.slot]
-                    if item and item.id and item.id > 0 then
-                        local item_res = res.items[item.id]
-                        local item_name = item_res and item_res.en or ('Item ' .. item.id)
-                        table.insert(gear, {
-                            slot = slot_name,
-                            itemId = item.id,
-                            itemName = item_name,
-                        })
+            local ekey = equip_keys[slot_id]
+            if ekey then
+                local inv_index = equip[ekey]
+                local bag_id = equip[ekey .. '_bag']
+                if inv_index and inv_index > 0 and bag_id then
+                    local bag_key = bag_names[bag_id]
+                    local bag_table = bag_key and items[bag_key]
+                    if bag_table then
+                        local item = bag_table[inv_index]
+                        if item and item.id and item.id > 0 then
+                            local item_res = res.items[item.id]
+                            local item_name = item_res and item_res.en or ('Item ' .. item.id)
+                            table.insert(gear, {
+                                slot = slot_name,
+                                itemId = item.id,
+                                itemName = item_name,
+                            })
+                        end
                     end
                 end
             end
@@ -301,26 +384,23 @@ local function do_sync()
 
     local payload = json_encode(state)
     local url = settings.ApiUrl .. '/api/sync'
+    local ltn12 = require('ltn12')
 
-    -- Note: LuaSocket HTTP is synchronous and will briefly freeze the game.
+    -- Note: HTTP request is synchronous and will briefly freeze the game.
     -- This is acceptable for an infrequent sync (every 5-15 min). A short timeout
     -- limits the freeze if the API is unreachable.
-    local http = require('socket.http')
-    local ltn12 = require('ltn12')
-    http.TIMEOUT = 5
-
-        local response_body = {}
-        local result, status_code, headers = http.request({
-            url = url,
-            method = 'POST',
-            headers = {
-                ['Content-Type'] = 'application/json',
-                ['Content-Length'] = tostring(#payload),
-                ['X-Api-Key'] = settings.ApiKey,
-            },
-            source = ltn12.source.string(payload),
-            sink = ltn12.sink.table(response_body),
-        })
+    local response_body = {}
+    local result, status_code, headers = http_request({
+        url = url,
+        method = 'POST',
+        headers = {
+            ['Content-Type'] = 'application/json',
+            ['Content-Length'] = tostring(#payload),
+            ['X-Api-Key'] = settings.ApiKey,
+        },
+        source = ltn12.source.string(payload),
+        sink = ltn12.sink.table(response_body),
+    })
 
         if not result then
             log_error('Connection failed: ' .. tostring(status_code))
@@ -410,13 +490,10 @@ local function scan_bazaars()
     })
 
     local url = settings.ApiUrl .. '/api/economy/bazaar/presence'
-
-    local http = require('socket.http')
     local ltn12 = require('ltn12')
-    http.TIMEOUT = 5
 
     local response_body = {}
-    http.request({
+    http_request({
         url = url,
         method = 'POST',
         headers = {
