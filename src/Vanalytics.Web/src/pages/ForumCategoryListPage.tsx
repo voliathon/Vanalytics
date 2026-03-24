@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import type { CategoryResponse, UserProfile } from '../types/api'
 import ForumCategoryCard from '../components/forum/ForumCategoryCard'
 import ForumCategoryManager from '../components/forum/ForumCategoryManager'
+import ForumSearchBar from '../components/forum/ForumSearchBar'
 
 function isModerator(user: UserProfile | null): boolean {
   return user?.role === 'Moderator' || user?.role === 'Admin'
@@ -49,6 +50,10 @@ export default function ForumCategoryListPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-100">Forum</h1>
         <p className="text-sm text-gray-500">Community discussion</p>
+      </div>
+
+      <div className="max-w-lg mb-4">
+        <ForumSearchBar />
       </div>
 
       {mod && (

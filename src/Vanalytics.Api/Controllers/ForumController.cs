@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Soverance.Forum.DTOs;
 using Soverance.Forum.Services;
 using Vanalytics.Api.DTOs;
+using Vanalytics.Api.Services;
 
 namespace Vanalytics.Api.Controllers;
 
@@ -13,11 +14,29 @@ public class ForumController : ControllerBase
 {
     private readonly IForumService _forum;
     private readonly IForumAuthorResolver _authors;
+    private readonly IForumSearchService _search;
 
-    public ForumController(IForumService forum, IForumAuthorResolver authors)
+    public ForumController(IForumService forum, IForumAuthorResolver authors, IForumSearchService search)
     {
         _forum = forum;
         _authors = authors;
+        _search = search;
+    }
+
+    // === Search (Public) ===
+
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(
+        [FromQuery] string? q = null,
+        [FromQuery] int? afterRank = null,
+        [FromQuery] int? afterId = null,
+        [FromQuery] int limit = 25)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 3)
+            return BadRequest(new { error = "Search query must be at least 3 characters." });
+
+        var (results, hasMore) = await _search.SearchAsync(q.Trim(), afterRank, afterId, limit);
+        return Ok(new { results, hasMore });
     }
 
     // === Categories (Public) ===

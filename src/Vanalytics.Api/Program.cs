@@ -85,6 +85,7 @@ builder.Services.AddHostedService<BazaarStalenessJob>();
 // Forum
 builder.Services.AddForumServices();
 builder.Services.AddScoped<IForumAuthorResolver, VanalyticsForumAuthorResolver>();
+builder.Services.AddScoped<IForumSearchService, ForumSearchService>();
 
 var app = builder.Build();
 

@@ -215,6 +215,28 @@ export interface PaginatedPosts {
   hasMore: boolean
 }
 
+export interface ForumSearchResult {
+  threadId: number
+  threadTitle: string
+  threadSlug: string
+  categorySlug: string
+  categoryName: string
+  isPinned: boolean
+  isLocked: boolean
+  authorId: string
+  authorUsername: string
+  authorAvatarHash: string | null
+  matchSnippet: string
+  replyCount: number
+  voteCount: number
+  lastPostAt: string
+}
+
+export interface PaginatedSearchResults {
+  results: ForumSearchResult[]
+  hasMore: boolean
+}
+
 // Admin
 export interface AdminUser {
   id: string

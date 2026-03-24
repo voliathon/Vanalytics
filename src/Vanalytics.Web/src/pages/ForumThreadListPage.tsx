@@ -4,6 +4,7 @@ import { api, ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import type { CategoryResponse, PaginatedThreads, EnrichedThreadSummaryResponse, UserProfile } from '../types/api'
 import ForumThreadRow from '../components/forum/ForumThreadRow'
+import ForumSearchBar from '../components/forum/ForumSearchBar'
 
 function isModerator(user: UserProfile | null): boolean {
   return user?.role === 'Moderator' || user?.role === 'Admin'
@@ -113,6 +114,9 @@ export default function ForumThreadListPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-100">{category?.name ?? ''}</h1>
           {category?.description && <p className="text-sm text-gray-500 mt-1">{category.description}</p>}
+          <div className="max-w-lg mt-3">
+            <ForumSearchBar />
+          </div>
         </div>
         {user ? (
           <button

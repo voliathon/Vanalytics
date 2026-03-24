@@ -273,4 +273,61 @@ public class ForumControllerTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
     }
+
+    [Fact]
+    public async Task Search_EmptyQuery_Returns400()
+    {
+        var resp = await _client.GetAsync("/api/forum/search?q=ab");
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task Search_NoResults_ReturnsEmptyList()
+    {
+        var resp = await _client.GetAsync("/api/forum/search?q=zzzznonexistent");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(0, json.GetProperty("results").GetArrayLength());
+        Assert.False(json.GetProperty("hasMore").GetBoolean());
+    }
+
+    [Fact]
+    public async Task Search_MatchesThreadTitle()
+    {
+        var modToken = await GetModeratorTokenAsync("search1@test.com", "searchmod1");
+        await _client.SendAsync(
+            Authed(HttpMethod.Post, "/api/forum/categories", modToken,
+                new CreateCategoryRequest("SearchCat", "")));
+
+        var memberToken = await RegisterAndGetTokenAsync("searchmem1@test.com", "searchmem1");
+        await _client.SendAsync(
+            Authed(HttpMethod.Post, "/api/forum/categories/searchcat/threads", memberToken,
+                new CreateThreadRequest("UniqueSearchableTitle", "Some body content")));
+
+        var resp = await _client.GetAsync("/api/forum/search?q=UniqueSearchableTitle");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var results = json.GetProperty("results");
+        Assert.True(results.GetArrayLength() > 0);
+        Assert.Equal("UniqueSearchableTitle", results[0].GetProperty("threadTitle").GetString());
+    }
+
+    [Fact]
+    public async Task Search_MatchesPostBody()
+    {
+        var modToken = await GetModeratorTokenAsync("search2@test.com", "searchmod2");
+        await _client.SendAsync(
+            Authed(HttpMethod.Post, "/api/forum/categories", modToken,
+                new CreateCategoryRequest("SearchCat2", "")));
+
+        var memberToken = await RegisterAndGetTokenAsync("searchmem2@test.com", "searchmem2");
+        await _client.SendAsync(
+            Authed(HttpMethod.Post, "/api/forum/categories/searchcat2/threads", memberToken,
+                new CreateThreadRequest("Normal Title", "VeryUniqueBodyContent12345")));
+
+        var resp = await _client.GetAsync("/api/forum/search?q=VeryUniqueBodyContent12345");
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(json.GetProperty("results").GetArrayLength() > 0);
+    }
 }
