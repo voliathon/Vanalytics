@@ -474,8 +474,13 @@ export default function ZoneBrowserPage() {
                     value={query}
                     onChange={e => setQuery(e.target.value)}
                     placeholder={selectedExpansion ? `Search ${selectedExpansion}...` : 'Search all zones...'}
-                    className="w-full pl-8 pr-3 py-1.5 text-sm rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-600"
+                    className="w-full pl-8 pr-8 py-1.5 text-sm rounded-lg bg-gray-800 border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-600"
                   />
+                  {query && (
+                    <button onClick={() => setQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
                 <button
                   onClick={loadRandom}
@@ -484,12 +489,6 @@ export default function ZoneBrowserPage() {
                 >
                   <Shuffle className="h-3.5 w-3.5" />
                   Random
-                </button>
-                <button
-                  onClick={() => setBrowserOpen(false)}
-                  className="p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-gray-800"
-                >
-                  <X className="h-4 w-4" />
                 </button>
               </div>
 

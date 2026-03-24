@@ -68,7 +68,17 @@ public class ForumController : ControllerBase
     public async Task<IActionResult> GetThread(string categorySlug, string threadSlug)
     {
         var thread = await _forum.GetThreadBySlugAsync(categorySlug, threadSlug);
-        return thread != null ? Ok(thread) : NotFound();
+        if (thread == null) return NotFound();
+
+        var authors = await _authors.ResolveAuthorsAsync([thread.AuthorId]);
+        var author = authors.GetValueOrDefault(thread.AuthorId);
+
+        return Ok(new EnrichedThreadDetailResponse(
+            thread.Id, thread.Title, thread.Slug, thread.CategoryId, thread.CategoryName, thread.CategorySlug,
+            thread.IsPinned, thread.IsLocked, thread.AuthorId,
+            thread.CreatedAt, thread.LastPostAt,
+            author?.Username ?? "[deleted]",
+            author?.AvatarHash));
     }
 
     // === Posts (Public, with optional auth for vote status) ===

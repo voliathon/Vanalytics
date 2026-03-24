@@ -11,3 +11,9 @@ public record EnrichedThreadSummaryResponse(
     Guid AuthorId, int ReplyCount, int VoteCount,
     DateTimeOffset CreatedAt, DateTimeOffset LastPostAt,
     string AuthorUsername, string? AuthorAvatarHash);
+
+public record EnrichedThreadDetailResponse(
+    int Id, string Title, string Slug, int CategoryId, string CategoryName, string CategorySlug,
+    bool IsPinned, bool IsLocked, Guid AuthorId,
+    DateTimeOffset CreatedAt, DateTimeOffset LastPostAt,
+    string AuthorUsername, string? AuthorAvatarHash);
