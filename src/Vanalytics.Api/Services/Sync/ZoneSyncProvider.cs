@@ -111,13 +111,13 @@ public class ZoneSyncProvider : ISyncProvider
         {
             ct.ThrowIfCancellationRequested();
 
-            if (!int.TryParse(row.GetValueOrDefault("id"), out var id)) continue;
-            var name = row.GetValueOrDefault("name") ?? string.Empty;
-            var modelPath = row.GetValueOrDefault("model_path");
-            var dialogPath = row.GetValueOrDefault("dialog_path");
-            var npcPath = row.GetValueOrDefault("npc_path");
-            var eventPath = row.GetValueOrDefault("event_path");
-            var mapPaths = row.GetValueOrDefault("map_paths");
+            if (!int.TryParse(row.GetValueOrDefault("ID"), out var id)) continue;
+            var name = row.GetValueOrDefault("NAME") ?? string.Empty;
+            var modelPath = row.GetValueOrDefault("MODEL");
+            var dialogPath = row.GetValueOrDefault("DIALOG");
+            var npcPath = row.GetValueOrDefault("NPCs");
+            var eventPath = row.GetValueOrDefault("EVENTS");
+            var mapPaths = row.GetValueOrDefault("MAP_PATHS");
             var expansion = DeriveExpansion(modelPath);
 
             if (existing.TryGetValue(id, out var zone))

@@ -31,7 +31,8 @@ export default function ZoneBrowserPage() {
   const [selected, setSelected] = useState<ZoneEntry | null>(null)
   const [zoneData, setZoneData] = useState<ParsedZone | null>(null)
   const [cameraMode, setCameraMode] = useState<'orbit' | 'fly'>('orbit')
-  const [lighting, setLighting] = useState<'standard' | 'enhanced'>('standard')
+  const [fogDensity, setFogDensity] = useState(0)  // 0=off, 0.5=default, 1=thick
+  const [flySpeed, setFlySpeed] = useState<number | null>(null)
   const [minimapTextures, setMinimapTextures] = useState<ParsedTexture[]>([])
   const [showSpawns, setShowSpawns] = useState(false)
   const [spawnPoints, setSpawnPoints] = useState<SpawnPoint[]>([])
@@ -256,7 +257,8 @@ export default function ZoneBrowserPage() {
         {zoneData && (
           <ThreeZoneViewer
             zoneData={zoneData}
-            lighting={lighting}
+            fogDensity={fogDensity}
+            onFlySpeedChange={setFlySpeed}
             cameraMode={cameraMode}
             spawnMarkers={spawnPoints}
             showSpawns={showSpawns}
@@ -328,16 +330,29 @@ export default function ZoneBrowserPage() {
             Fly
           </button>
         </div>
-        <button
-          onClick={() => setLighting(l => l === 'standard' ? 'enhanced' : 'standard')}
-          className={`px-2.5 py-1 text-xs rounded-lg border shadow-lg backdrop-blur transition-colors ${
-            lighting === 'enhanced'
-              ? 'bg-amber-600/90 border-amber-500/50 text-white'
-              : 'bg-gray-900/90 border-gray-700/50 text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          Lighting
-        </button>
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 shadow-lg">
+          <button
+            onClick={() => setFogDensity(d => d > 0 ? 0 : 0.5)}
+            className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              fogDensity > 0
+                ? 'bg-blue-600 text-white'
+                : 'text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            Fog
+          </button>
+          {fogDensity > 0 && (
+            <input
+              type="range"
+              min="0.1"
+              max="1"
+              step="0.05"
+              value={fogDensity}
+              onChange={(e) => setFogDensity(parseFloat(e.target.value))}
+              className="w-16 h-1 accent-blue-500"
+            />
+          )}
+        </div>
         <button
           onClick={handleToggleSpawns}
           title="Toggle spawn markers"
@@ -350,6 +365,11 @@ export default function ZoneBrowserPage() {
           <Users className="h-3 w-3" />
           Spawns
         </button>
+        {cameraMode === 'fly' && flySpeed !== null && (
+          <div className="px-2.5 py-1 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 shadow-lg text-xs text-gray-400" title="Scroll wheel to adjust fly speed">
+            Speed <span className="font-mono text-gray-200">{flySpeed.toFixed(2)}</span>
+          </div>
+        )}
       </div>
 
       {/* ── Bottom-left: zone info ── */}

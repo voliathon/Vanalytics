@@ -8,16 +8,20 @@ import type { SpawnPoint } from '../../lib/ffxi-dat/SpawnParser'
 
 interface ThreeZoneViewerProps {
   zoneData: ParsedZone
-  lighting?: 'standard' | 'enhanced'
+  fogDensity?: number  // 0 = off, 0-1 = near/far multiplier (higher = thicker)
   cameraMode?: 'orbit' | 'fly'
+  onFlySpeedChange?: (speed: number) => void
   spawnMarkers?: SpawnPoint[]
   showSpawns?: boolean
 }
 
-export default function ThreeZoneViewer({ zoneData, lighting = 'standard', cameraMode = 'orbit', spawnMarkers, showSpawns }: ThreeZoneViewerProps) {
+const FOG_COLOR = '#b8c8d8'
+
+
+export default function ThreeZoneViewer({ zoneData, fogDensity = 0, cameraMode = 'orbit', onFlySpeedChange, spawnMarkers, showSpawns }: ThreeZoneViewerProps) {
   const { geometries, materials } = useMemo(() => {
     const geometries: THREE.BufferGeometry[] = []
-    const materials: THREE.MeshStandardMaterial[] = []
+    const materials: THREE.MeshBasicMaterial[] = []
 
     for (const prefab of zoneData.prefabs) {
       const geometry = new THREE.BufferGeometry()
@@ -46,27 +50,25 @@ export default function ThreeZoneViewer({ zoneData, lighting = 'standard', camer
       geometries.push(geometry)
 
       const tex = zoneData.textures[prefab.materialIndex]
-      let material: THREE.MeshStandardMaterial
+      let material: THREE.MeshBasicMaterial
       if (tex) {
-        const texture = new THREE.DataTexture(new Uint8Array(tex.rgba), tex.width, tex.height, THREE.RGBAFormat)
+        const rgba = new Uint8Array(tex.rgba)
+        const texture = new THREE.DataTexture(rgba, tex.width, tex.height, THREE.RGBAFormat)
         texture.needsUpdate = true
         texture.magFilter = THREE.LinearFilter
         texture.minFilter = THREE.LinearMipmapLinearFilter
         texture.generateMipmaps = true
         texture.flipY = false
-        material = new THREE.MeshStandardMaterial({
+
+        material = new THREE.MeshBasicMaterial({
           map: texture,
           vertexColors: true,
           side: THREE.DoubleSide,
-          metalness: 0,
-          roughness: 1,
         })
       } else {
-        material = new THREE.MeshStandardMaterial({
+        material = new THREE.MeshBasicMaterial({
           vertexColors: true,
           side: THREE.DoubleSide,
-          metalness: 0,
-          roughness: 1,
         })
       }
 
@@ -109,10 +111,8 @@ export default function ThreeZoneViewer({ zoneData, lighting = 'standard', camer
     return () => {
       geometries.forEach(g => g.dispose())
       materials.forEach(m => {
-        if (m instanceof THREE.MeshStandardMaterial) {
-          m.map?.dispose()
-          m.dispose()
-        }
+        m.map?.dispose()
+        m.dispose()
       })
     }
   }, [geometries, materials])
@@ -129,22 +129,18 @@ export default function ThreeZoneViewer({ zoneData, lighting = 'standard', camer
       gl={{ antialias: true }}
       className="w-full h-full"
     >
-      {lighting === 'enhanced' ? (
-        <>
-          <ambientLight intensity={0.3} color="#8090a8" />
-          <directionalLight position={[cx + size, cy + size * 2, cz + size]} intensity={1.2} color="#ffe8c0" />
-        </>
-      ) : (
-        <>
-          <ambientLight intensity={0.6} color="#c8b8a0" />
-          <directionalLight position={[2, 4, 3]} intensity={0.8} color="#fff0d8" />
-        </>
+      {/* Sky background — matches fog color for seamless blending */}
+      <color attach="background" args={[fogDensity > 0 ? FOG_COLOR : '#1a1a2e']} />
+
+      {/* Distance fog — density controls near/far range */}
+      {fogDensity > 0 && (
+        <FogController color={FOG_COLOR} size={size} density={fogDensity} />
       )}
 
       {cameraMode === 'orbit' ? (
         <OrbitControls target={[cx, cy, cz]} maxDistance={size * 5} />
       ) : (
-        <FlyCamera center={center} size={size} />
+        <FlyCamera center={center} size={size} onSpeedChange={onFlySpeedChange} />
       )}
 
       {/* FFXI uses inverted Y — flip with Math.PI rotation like entity viewer */}
@@ -169,16 +165,31 @@ export default function ThreeZoneViewer({ zoneData, lighting = 'standard', camer
   )
 }
 
-function FlyCamera({ center, size }: { center: THREE.Vector3; size: number }) {
+/** Applies fog to the scene imperatively so density can change without remounting */
+function FogController({ color, size, density }: { color: string; size: number; density: number }) {
+  const { scene } = useThree()
+
+  useEffect(() => {
+    // density 0.5 = default range, lower = farther fog, higher = closer fog
+    const near = size * (0.6 - density * 0.5)
+    const far = size * (3.0 - density * 2.0)
+    scene.fog = new THREE.Fog(color, Math.max(0, near), Math.max(far, near + 10))
+    return () => { scene.fog = null }
+  }, [scene, color, size, density])
+
+  return null
+}
+
+function FlyCamera({ center, size, onSpeedChange }: { center: THREE.Vector3; size: number; onSpeedChange?: (speed: number) => void }) {
   const { camera, gl } = useThree()
   const moveState = useRef({ forward: false, backward: false, left: false, right: false, up: false, down: false })
-  const speed = useRef(size * 0.01)
+  const speed = useRef(size * 0.003)  // Slower default (was 0.01)
   const locked = useRef(false)
 
   useEffect(() => {
-    // Position camera at zone center on mount
     camera.position.set(center.x, center.y + size * 0.5, center.z + size)
     camera.lookAt(center)
+    onSpeedChange?.(speed.current)
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'KeyW') moveState.current.forward = true
@@ -197,7 +208,8 @@ function FlyCamera({ center, size }: { center: THREE.Vector3; size: number }) {
       if (e.code === 'ShiftLeft') moveState.current.down = false
     }
     const onWheel = (e: WheelEvent) => {
-      speed.current = Math.max(0.1, speed.current * (e.deltaY > 0 ? 1.2 : 0.8))
+      speed.current = Math.max(0.05, speed.current * (e.deltaY > 0 ? 1.25 : 0.8))
+      onSpeedChange?.(speed.current)
     }
     const onClick = () => {
       gl.domElement.requestPointerLock()
@@ -231,7 +243,7 @@ function FlyCamera({ center, size }: { center: THREE.Vector3; size: number }) {
       document.removeEventListener('mousemove', onMouseMove)
       if (document.pointerLockElement) document.exitPointerLock()
     }
-  }, [camera, gl, center, size])
+  }, [camera, gl, center, size, onSpeedChange])
 
   useFrame(() => {
     if (!locked.current) return

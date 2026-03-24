@@ -43,7 +43,12 @@ export function decompressDXT1(data: Uint8Array, width: number, height: number):
         pal[11] = 255; pal[15] = 255
       } else {
         for (let i = 0; i < 3; i++) pal[8 + i] = ((pal[i] + pal[4 + i]) / 2) | 0
-        pal[11] = 255; pal[15] = 0
+        pal[11] = 255
+        // DXT1 1-bit alpha: c0<=c1 makes 4th color transparent.
+        // FFXI uses DXT3 for actual transparency (foliage etc) and controls
+        // blending via per-mesh flags — DXT1 alpha is not used intentionally.
+        // Force opaque to prevent ground/wall texture holes.
+        pal[15] = 255
       }
 
       for (let py = 0; py < 4; py++) {
@@ -72,8 +77,7 @@ export function decompressDXT3(data: Uint8Array, width: number, height: number):
 
   for (let by = 0; by < blocksY; by++) {
     for (let bx = 0; bx < blocksX; bx++) {
-      const alpha = data.subarray(src, src + 8)
-      src += 8
+      src += 8 // skip 8-byte alpha block (forced opaque)
 
       const c0 = data[src] | (data[src + 1] << 8)
       const c1 = data[src + 2] | (data[src + 3] << 8)
@@ -95,8 +99,9 @@ export function decompressDXT3(data: Uint8Array, width: number, height: number):
           const pi = py * 4 + px
           const ci = (idx >>> (pi * 2)) & 3
           const d = (y * width + x) * 4
-          const a4 = (pi % 2 === 0) ? (alpha[pi >> 1] & 0xF) : ((alpha[pi >> 1] >> 4) & 0xF)
-          rgba[d] = pal[ci][0]; rgba[d + 1] = pal[ci][1]; rgba[d + 2] = pal[ci][2]; rgba[d + 3] = (a4 << 4) | a4
+          // DXT3 has explicit 4-bit alpha, but FFXI controls transparency via
+          // per-mesh blending flags — force opaque to prevent texture holes.
+          rgba[d] = pal[ci][0]; rgba[d + 1] = pal[ci][1]; rgba[d + 2] = pal[ci][2]; rgba[d + 3] = 255
         }
       }
     }

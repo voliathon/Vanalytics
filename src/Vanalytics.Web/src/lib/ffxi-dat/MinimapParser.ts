@@ -14,7 +14,7 @@ export function parseMinimapDat(buffer: ArrayBuffer): ParsedTexture | null {
 
   while (offset < reader.length - DATHEAD_SIZE) {
     reader.seek(offset)
-    const name = reader.readString(4)
+    reader.skip(4) // block name
     const packed = reader.readUint32()
     const type = packed & 0x7F
     const nextUnits = (packed >> 7) & 0x7FFFF

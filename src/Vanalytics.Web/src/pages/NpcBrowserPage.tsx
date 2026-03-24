@@ -22,7 +22,6 @@ export default function NpcBrowserPage() {
   const [meshData, setMeshData] = useState<{ meshes: ParsedMesh[]; textures: ParsedTexture[] } | null>(null)
   const [modelLoading, setModelLoading] = useState(false)
   const [viewMode, setViewMode] = useState<'3d' | 'wireframe'>('3d')
-  const [lighting, setLighting] = useState<'standard' | 'enhanced'>('standard')
   const [parseLog, setParseLog] = useState<string[]>([])
   const [browserOpen, setBrowserOpen] = useState(false)
   const [logOpen, setLogOpen] = useState(true)
@@ -252,7 +251,7 @@ export default function NpcBrowserPage() {
         )}
 
         {meshData && viewMode === '3d' && (
-          <ThreeModelViewer meshData={meshData} lighting={lighting} />
+          <ThreeModelViewer meshData={meshData} />
         )}
 
         {meshData && viewMode === 'wireframe' && (
@@ -322,16 +321,6 @@ export default function NpcBrowserPage() {
             Wireframe
           </button>
         </div>
-        <button
-          onClick={() => setLighting(l => l === 'standard' ? 'enhanced' : 'standard')}
-          className={`px-2.5 py-1 text-xs rounded-lg border shadow-lg backdrop-blur transition-colors ${
-            lighting === 'enhanced'
-              ? 'bg-amber-600/90 border-amber-500/50 text-white'
-              : 'bg-gray-900/90 border-gray-700/50 text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          Lighting
-        </button>
       </div>
 
       {/* ── Bottom-left: model info ── */}
