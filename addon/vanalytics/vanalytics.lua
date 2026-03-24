@@ -673,12 +673,29 @@ windower.register_event('addon command', function(command, ...)
             log_error('Failed to write dump file.')
         end
 
+    elseif command == 'url' then
+        local url = args[1]
+        if not url or url == '' then
+            log('Current API URL: ' .. settings.ApiUrl)
+            return
+        end
+        if url == 'local' then
+            url = 'http://localhost:5000'
+        elseif url == 'prod' then
+            url = 'https://vanalytics.soverance.com'
+        end
+        settings.ApiUrl = url
+        config.save(settings)
+        log_success('API URL set to: ' .. url)
+
     elseif command == 'help' then
         log('--- Vanalytics Commands ---')
         log('//vanalytics apikey <key> - Set your API key')
+        log('//vanalytics url <url>    - Set API URL (or: local / prod)')
         log('//vanalytics sync         - Sync now')
         log('//vanalytics status       - Show status')
         log('//vanalytics interval N   - Set sync interval (min: ' .. MIN_INTERVAL .. ')')
+        log('//vanalytics dump         - Dump player data to file')
         log('//vanalytics help         - Show this help')
 
     else
