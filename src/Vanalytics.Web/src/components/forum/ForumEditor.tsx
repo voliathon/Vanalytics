@@ -72,7 +72,7 @@ export default function ForumEditor({ content = '', onChange, placeholder = 'Wri
       attributes: {
         class: 'prose prose-invert prose-sm max-w-none focus:outline-none min-h-[120px] px-3 py-2',
       },
-      handleDrop: (view, event) => {
+      handleDrop: (_view, event) => {
         const files = event.dataTransfer?.files
         if (files?.length) {
           const imageFile = Array.from(files).find(f => ALLOWED_TYPES.includes(f.type))
@@ -84,7 +84,7 @@ export default function ForumEditor({ content = '', onChange, placeholder = 'Wri
         }
         return false
       },
-      handlePaste: (view, event) => {
+      handlePaste: (_view, event) => {
         const files = event.clipboardData?.files
         if (files?.length) {
           const imageFile = Array.from(files).find(f => ALLOWED_TYPES.includes(f.type))
