@@ -10,6 +10,7 @@ using Soverance.Auth.DTOs;
 using Soverance.Auth.Models;
 using Soverance.Forum.DTOs;
 using Testcontainers.MsSql;
+using Vanalytics.Api.Services;
 using Vanalytics.Data;
 
 namespace Vanalytics.Api.Tests.Controllers;
@@ -31,6 +32,15 @@ public class ForumControllerTests : IAsyncLifetime
                     var desc = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<VanalyticsDbContext>));
                     if (desc != null) services.Remove(desc);
                     services.AddDbContext<VanalyticsDbContext>(o => o.UseSqlServer(_container.GetConnectionString()));
+
+                    // Force local storage implementations in tests (user secrets may provide Azure connection string)
+                    var imageStoreDesc = services.SingleOrDefault(d => d.ServiceType == typeof(IItemImageStore));
+                    if (imageStoreDesc != null) services.Remove(imageStoreDesc);
+                    services.AddSingleton<IItemImageStore, LocalItemImageStore>();
+
+                    var attachmentStoreDesc = services.SingleOrDefault(d => d.ServiceType == typeof(IForumAttachmentStore));
+                    if (attachmentStoreDesc != null) services.Remove(attachmentStoreDesc);
+                    services.AddSingleton<IForumAttachmentStore, LocalForumAttachmentStore>();
                 });
                 builder.ConfigureAppConfiguration((_, config) =>
                 {
@@ -40,7 +50,8 @@ public class ForumControllerTests : IAsyncLifetime
                         ["Jwt:Issuer"] = "VanalyticsTest",
                         ["Jwt:Audience"] = "VanalyticsTest",
                         ["Jwt:AccessTokenExpirationMinutes"] = "15",
-                        ["Jwt:RefreshTokenExpirationDays"] = "7"
+                        ["Jwt:RefreshTokenExpirationDays"] = "7",
+                        ["AzureStorage:ConnectionString"] = null
                     });
                 });
             });
@@ -329,5 +340,142 @@ public class ForumControllerTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
         var json = await resp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.True(json.GetProperty("results").GetArrayLength() > 0);
+    }
+
+    // ===== Attachment Upload Tests =====
+
+    [Fact]
+    public async Task CreatePost_TooManyImages_Returns400()
+    {
+        var token = await GetModeratorTokenAsync("imgposter@test.com", "imgposter");
+
+        // Create a category and thread first
+        var catResp = await _client.SendAsync(Authed(HttpMethod.Post, "/api/forum/categories",
+            token, new { name = "ImgTest", description = "Test", displayOrder = 1 }));
+        var cat = await catResp.Content.ReadFromJsonAsync<JsonElement>();
+        var catSlug = cat.GetProperty("slug").GetString();
+
+        var threadResp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/categories/{catSlug}/threads",
+            token, new { title = "Image Thread", body = "First post" }));
+        var thread = await threadResp.Content.ReadFromJsonAsync<JsonElement>();
+        var threadId = thread.GetProperty("id").GetInt32();
+
+        // Build body with 6 images (over limit of 5)
+        var imgs = string.Join("", Enumerable.Range(0, 6).Select(i =>
+            $"<img src=\"/forum-attachments/attachments/{Guid.NewGuid()}.png\">"));
+        var body = $"<p>Too many images</p>{imgs}";
+
+        var resp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/threads/{threadId}/posts",
+            token, new { body }));
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_Unauthenticated_Returns401()
+    {
+        var content = new MultipartFormDataContent();
+        content.Add(new ByteArrayContent(new byte[] { 1, 2, 3 }), "file", "test.png");
+
+        var resp = await _client.PostAsync("/api/forum/attachments", content);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_NoFile_Returns400()
+    {
+        var token = await RegisterAndGetTokenAsync("uploader@test.com", "uploader");
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/forum/attachments");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        req.Content = new MultipartFormDataContent();
+
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_TooLarge_Returns400()
+    {
+        var token = await RegisterAndGetTokenAsync("uploader2@test.com", "uploader2");
+        var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(new byte[6 * 1024 * 1024]); // 6MB
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        content.Add(fileContent, "file", "big.png");
+
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/forum/attachments");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        req.Content = content;
+
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_InvalidType_Returns400()
+    {
+        var token = await RegisterAndGetTokenAsync("uploader3@test.com", "uploader3");
+        var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
+        content.Add(fileContent, "file", "doc.pdf");
+
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/forum/attachments");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        req.Content = content;
+
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_ValidImage_ReturnsIdAndUrl()
+    {
+        var token = await RegisterAndGetTokenAsync("uploader4@test.com", "uploader4");
+        var content = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(new byte[] { 137, 80, 78, 71 }); // PNG magic bytes
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+        content.Add(fileContent, "file", "screenshot.png");
+
+        var req = new HttpRequestMessage(HttpMethod.Post, "/api/forum/attachments");
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        req.Content = content;
+
+        var resp = await _client.SendAsync(req);
+
+        Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
+        var result = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(result.TryGetProperty("id", out _));
+        Assert.True(result.TryGetProperty("url", out _));
+    }
+
+    [Fact]
+    public async Task CreatePost_ExternalImageStripped()
+    {
+        var token = await GetModeratorTokenAsync("sanitize@test.com", "sanitize");
+
+        var catResp = await _client.SendAsync(Authed(HttpMethod.Post, "/api/forum/categories",
+            token, new { name = "SanitizeTest", description = "Test", displayOrder = 2 }));
+        var cat = await catResp.Content.ReadFromJsonAsync<JsonElement>();
+        var catSlug = cat.GetProperty("slug").GetString();
+
+        var threadResp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/categories/{catSlug}/threads",
+            token, new { title = "Sanitize Thread", body = "First" }));
+        var thread = await threadResp.Content.ReadFromJsonAsync<JsonElement>();
+        var threadId = thread.GetProperty("id").GetInt32();
+
+        var body = "<p>Check this</p><img src=\"https://evil.com/tracker.png\"><img src=\"/forum-attachments/attachments/good.png\">";
+
+        var resp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/threads/{threadId}/posts",
+            token, new { body }));
+
+        Assert.Equal(HttpStatusCode.Created, resp.StatusCode);
+        var post = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        var resultBody = post.GetProperty("body").GetString()!;
+        Assert.DoesNotContain("evil.com", resultBody);
+        Assert.Contains("/forum-attachments/attachments/good.png", resultBody);
     }
 }

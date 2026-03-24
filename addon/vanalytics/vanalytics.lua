@@ -29,15 +29,15 @@ local MIN_INTERVAL = 5
 -- Utility: chat log output
 -----------------------------------------------------------------------
 local function log(msg)
-    windower.add_to_chat('\30\02[Vanalytics]\30\01 ' .. msg)
+    windower.add_to_chat(8, '[Vanalytics] ' .. msg)
 end
 
 local function log_error(msg)
-    windower.add_to_chat('\30\02[Vanalytics]\30\68 ' .. msg)
+    windower.add_to_chat(167, '[Vanalytics] ' .. msg)
 end
 
 local function log_success(msg)
-    windower.add_to_chat('\30\02[Vanalytics]\30\158 ' .. msg)
+    windower.add_to_chat(158, '[Vanalytics] ' .. msg)
 end
 
 -----------------------------------------------------------------------
@@ -484,6 +484,16 @@ windower.register_event('addon command', function(command, ...)
             log('Last Sync: ' .. last_sync_status)
         end
 
+    elseif command == 'apikey' then
+        local key = args[1]
+        if not key or key == '' then
+            log_error('Usage: //vanalytics apikey <your-api-key>')
+            return
+        end
+        settings.ApiKey = key
+        config.save(settings)
+        log_success('API key saved.')
+
     elseif command == 'interval' then
         local minutes = tonumber(args[1])
         if not minutes then
@@ -503,10 +513,11 @@ windower.register_event('addon command', function(command, ...)
 
     elseif command == 'help' then
         log('--- Vanalytics Commands ---')
-        log('//vanalytics sync       - Sync now')
-        log('//vanalytics status     - Show status')
-        log('//vanalytics interval N - Set sync interval (min: ' .. MIN_INTERVAL .. ')')
-        log('//vanalytics help       - Show this help')
+        log('//vanalytics apikey <key> - Set your API key')
+        log('//vanalytics sync         - Sync now')
+        log('//vanalytics status       - Show status')
+        log('//vanalytics interval N   - Set sync interval (min: ' .. MIN_INTERVAL .. ')')
+        log('//vanalytics help         - Show this help')
 
     else
         log_error('Unknown command: ' .. command .. '. Type //vanalytics help')
@@ -517,8 +528,13 @@ end)
 -- Addon lifecycle events
 -----------------------------------------------------------------------
 windower.register_event('login', function(name)
-    log('Logged in as ' .. name .. '. Auto-sync active (every ' .. get_effective_interval() .. ' min).')
-    start_timer()
+    if settings.ApiKey == '' then
+        log('Logged in as ' .. name .. '.')
+        log_error('No API key configured. Run: //vanalytics apikey <your-key>')
+    else
+        log('Logged in as ' .. name .. '. Auto-sync active (every ' .. get_effective_interval() .. ' min).')
+        start_timer()
+    end
 end)
 
 windower.register_event('logout', function()
@@ -531,8 +547,13 @@ windower.register_event('load', function()
     -- If already logged in when addon loads, start timer
     local player = windower.ffxi.get_player()
     if player then
-        log('Loaded. Auto-sync active (every ' .. get_effective_interval() .. ' min).')
-        start_timer()
+        if settings.ApiKey == '' then
+            log('Loaded.')
+            log_error('No API key configured. Run: //vanalytics apikey <your-key>')
+        else
+            log('Loaded. Auto-sync active (every ' .. get_effective_interval() .. ' min).')
+            start_timer()
+        end
     else
         log('Loaded. Waiting for login...')
     end

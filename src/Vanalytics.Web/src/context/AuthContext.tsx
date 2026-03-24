@@ -9,6 +9,7 @@ interface AuthState {
   register: (req: RegisterRequest) => Promise<void>
   oauthLogin: (provider: string, code: string, redirectUri: string) => Promise<void>
   samlExchange: (code: string) => Promise<void>
+  refreshUser: () => Promise<void>
   logout: () => void
 }
 
@@ -70,13 +71,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(profile)
   }
 
+  const refreshUser = async () => {
+    try {
+      const profile = await api<UserProfile>('/api/auth/me')
+      setUser(profile)
+    } catch {
+      clearTokens()
+      setUser(null)
+    }
+  }
+
   const logout = () => {
     clearTokens()
     setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, oauthLogin, samlExchange, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, oauthLogin, samlExchange, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   )

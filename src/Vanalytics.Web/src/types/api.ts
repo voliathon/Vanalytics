@@ -23,6 +23,7 @@ export interface UserProfile {
   email: string
   username: string
   hasApiKey: boolean
+  apiKeyCreatedAt: string | null
   role: UserRole
   oAuthProvider: string | null
   createdAt: string

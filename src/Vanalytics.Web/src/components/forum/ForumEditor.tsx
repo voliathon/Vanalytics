@@ -2,10 +2,17 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
+import Image from '@tiptap/extension-image'
+import { useRef, useState } from 'react'
+import { uploadFile } from '../../api/client'
 import {
   Bold, Italic, Strikethrough, Code, Heading2, Heading3,
-  List, ListOrdered, Quote, CodeSquare, Link2, Undo2, Redo2
+  List, ListOrdered, Quote, CodeSquare, Link2, Undo2, Redo2, ImagePlus
 } from 'lucide-react'
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024
+const MAX_IMAGES = 5
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 interface Props {
   content?: string
@@ -14,15 +21,17 @@ interface Props {
   editable?: boolean
 }
 
-function ToolbarButton({ onClick, active, children, title }: {
-  onClick: () => void; active?: boolean; children: React.ReactNode; title: string
+function ToolbarButton({ onClick, active, disabled, children, title }: {
+  onClick: () => void; active?: boolean; disabled?: boolean; children: React.ReactNode; title: string
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       title={title}
       className={`p-1.5 rounded transition-colors ${
+        disabled ? 'text-gray-600 cursor-not-allowed' :
         active ? 'bg-blue-600 text-white' : 'text-gray-400 hover:bg-gray-700 hover:text-gray-200'
       }`}
     >
@@ -31,7 +40,20 @@ function ToolbarButton({ onClick, active, children, title }: {
   )
 }
 
+function countImages(editor: ReturnType<typeof useEditor>): number {
+  if (!editor) return 0
+  let count = 0
+  editor.state.doc.descendants(node => {
+    if (node.type.name === 'image') count++
+  })
+  return count
+}
+
 export default function ForumEditor({ content = '', onChange, placeholder = 'Write something...', editable = true }: Props) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -39,6 +61,7 @@ export default function ForumEditor({ content = '', onChange, placeholder = 'Wri
       }),
       Link.configure({ openOnClick: false }),
       Placeholder.configure({ placeholder }),
+      Image.configure({ inline: false, allowBase64: false }),
     ],
     content,
     editable,
@@ -49,8 +72,62 @@ export default function ForumEditor({ content = '', onChange, placeholder = 'Wri
       attributes: {
         class: 'prose prose-invert prose-sm max-w-none focus:outline-none min-h-[120px] px-3 py-2',
       },
+      handleDrop: (view, event) => {
+        const files = event.dataTransfer?.files
+        if (files?.length) {
+          const imageFile = Array.from(files).find(f => ALLOWED_TYPES.includes(f.type))
+          if (imageFile) {
+            event.preventDefault()
+            handleUpload(imageFile)
+            return true
+          }
+        }
+        return false
+      },
+      handlePaste: (view, event) => {
+        const files = event.clipboardData?.files
+        if (files?.length) {
+          const imageFile = Array.from(files).find(f => ALLOWED_TYPES.includes(f.type))
+          if (imageFile) {
+            event.preventDefault()
+            handleUpload(imageFile)
+            return true
+          }
+        }
+        return false
+      },
     },
   })
+
+  const handleUpload = async (file: File) => {
+    if (!editor) return
+    setUploadError('')
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setUploadError('File type not allowed. Use JPEG, PNG, GIF, or WebP.')
+      return
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError('File is too large. Maximum size is 5 MB.')
+      return
+    }
+
+    if (countImages(editor) >= MAX_IMAGES) {
+      setUploadError(`Maximum ${MAX_IMAGES} images per post.`)
+      return
+    }
+
+    setUploading(true)
+    try {
+      const result = await uploadFile<{ id: number; url: string }>('/api/forum/attachments', file)
+      editor.chain().focus().setImage({ src: result.url }).run()
+    } catch {
+      setUploadError('Failed to upload image.')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   if (!editor) return null
 
@@ -64,6 +141,9 @@ export default function ForumEditor({ content = '', onChange, placeholder = 'Wri
       editor.chain().focus().setLink({ href: url }).run()
     }
   }
+
+  const imageCount = countImages(editor)
+  const canAddImage = imageCount < MAX_IMAGES && !uploading
 
   const iconSize = 'h-4 w-4'
 
@@ -106,6 +186,10 @@ export default function ForumEditor({ content = '', onChange, placeholder = 'Wri
           <Link2 className={iconSize} />
         </ToolbarButton>
         <div className="w-px bg-gray-700 mx-1" />
+        <ToolbarButton onClick={() => fileInputRef.current?.click()} disabled={!canAddImage} title={uploading ? 'Uploading...' : `Image (${imageCount}/${MAX_IMAGES})`}>
+          <ImagePlus className={iconSize} />
+        </ToolbarButton>
+        <div className="w-px bg-gray-700 mx-1" />
         <ToolbarButton onClick={() => editor.chain().focus().undo().run()} title="Undo">
           <Undo2 className={iconSize} />
         </ToolbarButton>
@@ -114,6 +198,18 @@ export default function ForumEditor({ content = '', onChange, placeholder = 'Wri
         </ToolbarButton>
       </div>
       <EditorContent editor={editor} />
+      {uploadError && <p className="text-red-400 text-xs px-3 py-1">{uploadError}</p>}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/gif,image/webp"
+        className="hidden"
+        onChange={e => {
+          const file = e.target.files?.[0]
+          if (file) handleUpload(file)
+          e.target.value = ''
+        }}
+      />
     </div>
   )
 }
