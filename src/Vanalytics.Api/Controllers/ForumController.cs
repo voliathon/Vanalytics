@@ -2,8 +2,12 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Soverance.Forum.DTOs;
+using Soverance.Forum.Models;
 using Soverance.Forum.Services;
 using Vanalytics.Api.DTOs;
+using Vanalytics.Api.Services;
+using Microsoft.EntityFrameworkCore;
+using Vanalytics.Data;
 
 namespace Vanalytics.Api.Controllers;
 
@@ -13,11 +17,31 @@ public class ForumController : ControllerBase
 {
     private readonly IForumService _forum;
     private readonly IForumAuthorResolver _authors;
+    private readonly IForumSearchService _search;
+    private readonly IForumAttachmentStore _attachmentStore;
 
-    public ForumController(IForumService forum, IForumAuthorResolver authors)
+    public ForumController(IForumService forum, IForumAuthorResolver authors, IForumSearchService search, IForumAttachmentStore attachmentStore)
     {
         _forum = forum;
         _authors = authors;
+        _search = search;
+        _attachmentStore = attachmentStore;
+    }
+
+    // === Search (Public) ===
+
+    [HttpGet("search")]
+    public async Task<IActionResult> Search(
+        [FromQuery] string? q = null,
+        [FromQuery] int? afterRank = null,
+        [FromQuery] int? afterId = null,
+        [FromQuery] int limit = 25)
+    {
+        if (string.IsNullOrWhiteSpace(q) || q.Trim().Length < 3)
+            return BadRequest(new { error = "Search query must be at least 3 characters." });
+
+        var (results, hasMore) = await _search.SearchAsync(q.Trim(), afterRank, afterId, limit);
+        return Ok(new { results, hasMore });
     }
 
     // === Categories (Public) ===
@@ -122,7 +146,10 @@ public class ForumController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Body))
             return BadRequest(new { error = "Body is required." });
 
-        var thread = await _forum.CreateThreadAsync(slug, request, GetUserId());
+        var sanitizedBody = SanitizeImageSources(request.Body);
+        var sanitizedRequest = new CreateThreadRequest(request.Title, sanitizedBody);
+
+        var thread = await _forum.CreateThreadAsync(slug, sanitizedRequest, GetUserId());
         if (thread == null) return NotFound();
 
         return StatusCode(201, thread);
@@ -137,8 +164,20 @@ public class ForumController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Body))
             return BadRequest(new { error = "Body is required." });
 
-        var post = await _forum.CreatePostAsync(threadId, request, GetUserId());
+        if (CountForumImages(request.Body) > MaxImagesPerPost)
+            return BadRequest(new { error = $"Posts cannot contain more than {MaxImagesPerPost} images." });
+
+        var sanitizedBody = SanitizeImageSources(request.Body);
+        var sanitizedRequest = new CreatePostRequest(sanitizedBody);
+
+        var post = await _forum.CreatePostAsync(threadId, sanitizedRequest, GetUserId());
         if (post == null) return Conflict(new { error = "Thread not found or is locked." });
+
+        if (post != null)
+        {
+            var db = HttpContext.RequestServices.GetRequiredService<VanalyticsDbContext>();
+            await LinkAttachmentsToPost(db, sanitizedBody, post.Id);
+        }
 
         return StatusCode(201, post);
     }
@@ -150,7 +189,13 @@ public class ForumController : ControllerBase
         if (string.IsNullOrWhiteSpace(request.Body))
             return BadRequest(new { error = "Body is required." });
 
-        var result = await _forum.UpdatePostAsync(postId, request, GetUserId(), false);
+        if (CountForumImages(request.Body) > MaxImagesPerPost)
+            return BadRequest(new { error = $"Posts cannot contain more than {MaxImagesPerPost} images." });
+
+        var sanitizedBody = SanitizeImageSources(request.Body);
+        var sanitizedRequest = new UpdatePostRequest(sanitizedBody);
+
+        var result = await _forum.UpdatePostAsync(postId, sanitizedRequest, GetUserId(), false);
         if (result == null) return NotFound();
 
         return Ok(result);
@@ -164,6 +209,51 @@ public class ForumController : ControllerBase
         if (!result) return NotFound();
 
         return NoContent();
+    }
+
+    // === Attachments (Authenticated) ===
+
+    private static readonly HashSet<string> AllowedContentTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "image/jpeg", "image/png", "image/gif", "image/webp"
+    };
+
+    private const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
+
+    [Authorize]
+    [HttpPost("attachments")]
+    public async Task<IActionResult> UploadAttachment(IFormFile? file)
+    {
+        if (file == null || file.Length == 0)
+            return BadRequest(new { error = "No file provided." });
+
+        if (file.Length > MaxFileSize)
+            return BadRequest(new { error = "File size exceeds 5 MB limit." });
+
+        if (!AllowedContentTypes.Contains(file.ContentType))
+            return BadRequest(new { error = "File type not allowed. Accepted: JPEG, PNG, GIF, WebP." });
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (string.IsNullOrEmpty(ext)) ext = ".png";
+        var storagePath = $"attachments/{Guid.NewGuid()}{ext}";
+
+        using var stream = file.OpenReadStream();
+        var url = await _attachmentStore.SaveAsync(storagePath, stream, file.ContentType);
+
+        var db = HttpContext.RequestServices.GetRequiredService<VanalyticsDbContext>();
+        var attachment = new ForumAttachment
+        {
+            FileName = file.FileName,
+            StoragePath = storagePath,
+            ContentType = file.ContentType,
+            FileSize = file.Length,
+            UploadedBy = GetUserId(),
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+        db.Set<ForumAttachment>().Add(attachment);
+        await db.SaveChangesAsync();
+
+        return Ok(new { id = attachment.Id, url });
     }
 
     // === Voting (Authenticated) ===
@@ -254,6 +344,96 @@ public class ForumController : ControllerBase
     }
 
     // === Helpers ===
+
+    private const int MaxImagesPerPost = 5;
+    private static readonly string AttachmentPathPrefix = "/forum-attachments/attachments/";
+
+    private static int CountForumImages(string html)
+    {
+        var count = 0;
+        var searchFrom = 0;
+        while (true)
+        {
+            var idx = html.IndexOf(AttachmentPathPrefix, searchFrom, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) break;
+            count++;
+            searchFrom = idx + AttachmentPathPrefix.Length;
+        }
+        return count;
+    }
+
+    private async Task LinkAttachmentsToPost(VanalyticsDbContext db, string html, long postId)
+    {
+        var guids = new List<string>();
+        var searchFrom = 0;
+        while (true)
+        {
+            var idx = html.IndexOf(AttachmentPathPrefix, searchFrom, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) break;
+            var start = idx + AttachmentPathPrefix.Length;
+            var end = html.IndexOfAny(new[] { '"', '\'', '>' }, start);
+            if (end > start)
+            {
+                var fileName = html[start..end];
+                guids.Add($"attachments/{fileName}");
+            }
+            searchFrom = start;
+        }
+
+        if (guids.Count > 0)
+        {
+            var attachments = await db.Set<ForumAttachment>()
+                .Where(a => guids.Contains(a.StoragePath) && a.PostId == null)
+                .ToListAsync();
+            foreach (var a in attachments)
+                a.PostId = postId;
+            await db.SaveChangesAsync();
+        }
+    }
+
+    private static string SanitizeImageSources(string html)
+    {
+        var result = new System.Text.StringBuilder(html.Length);
+        var pos = 0;
+        while (pos < html.Length)
+        {
+            var imgStart = html.IndexOf("<img ", pos, StringComparison.OrdinalIgnoreCase);
+            if (imgStart < 0)
+            {
+                result.Append(html, pos, html.Length - pos);
+                break;
+            }
+            result.Append(html, pos, imgStart - pos);
+
+            var imgEnd = html.IndexOf('>', imgStart);
+            if (imgEnd < 0)
+            {
+                result.Append(html, pos, html.Length - pos);
+                break;
+            }
+            imgEnd++;
+
+            var tag = html[imgStart..imgEnd];
+            var srcIdx = tag.IndexOf("src=\"", StringComparison.OrdinalIgnoreCase);
+            if (srcIdx >= 0)
+            {
+                var srcStart = srcIdx + 5;
+                var srcEnd = tag.IndexOf('"', srcStart);
+                if (srcEnd > srcStart)
+                {
+                    var src = tag[srcStart..srcEnd];
+                    if (src.StartsWith("/forum-attachments/", StringComparison.OrdinalIgnoreCase))
+                    {
+                        result.Append(tag);
+                    }
+                    // else: drop the img tag (external source)
+                }
+            }
+
+            pos = imgEnd;
+        }
+        return result.ToString();
+    }
 
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

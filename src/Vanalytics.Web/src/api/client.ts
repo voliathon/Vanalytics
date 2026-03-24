@@ -82,6 +82,38 @@ export async function api<T>(
   return JSON.parse(text)
 }
 
+export async function uploadFile<T>(
+  path: string,
+  file: File
+): Promise<T> {
+  const { accessToken } = getStoredTokens()
+
+  const headers: Record<string, string> = {}
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  let res = await fetch(path, { method: 'POST', headers, body: formData })
+
+  if (res.status === 401 && accessToken) {
+    const newToken = await refreshAccessToken()
+    if (newToken) {
+      headers['Authorization'] = `Bearer ${newToken}`
+      res = await fetch(path, { method: 'POST', headers, body: formData })
+    }
+  }
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ message: res.statusText }))
+    throw new ApiError(res.status, error.message ?? 'Upload failed')
+  }
+
+  return res.json()
+}
+
 export class ApiError extends Error {
   status: number
 

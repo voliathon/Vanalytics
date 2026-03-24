@@ -87,6 +87,14 @@ public class KeysControllerTests : IAsyncLifetime
         var keyResponse = await response.Content.ReadFromJsonAsync<ApiKeyResponse>();
         Assert.NotNull(keyResponse);
         Assert.NotEmpty(keyResponse.ApiKey);
+        Assert.True(keyResponse.GeneratedAt > DateTimeOffset.UtcNow.AddSeconds(-5));
+        Assert.True(keyResponse.GeneratedAt <= DateTimeOffset.UtcNow);
+
+        // Verify profile reflects ApiKeyCreatedAt
+        var profileResponse = await _client.SendAsync(AuthedRequest(HttpMethod.Get, "/api/auth/me", token));
+        var profile = await profileResponse.Content.ReadFromJsonAsync<UserProfileResponse>();
+        Assert.NotNull(profile!.ApiKeyCreatedAt);
+        Assert.True(profile.ApiKeyCreatedAt > DateTimeOffset.UtcNow.AddSeconds(-5));
     }
 
     [Fact]
@@ -104,6 +112,23 @@ public class KeysControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Generate_Twice_UpdatesTimestamp()
+    {
+        var token = await RegisterAndGetTokenAsync("keygen3@example.com", "keygen3");
+
+        var response1 = await _client.SendAsync(AuthedRequest(HttpMethod.Post, "/api/keys/generate", token));
+        var key1 = (await response1.Content.ReadFromJsonAsync<ApiKeyResponse>())!;
+
+        // Small delay to ensure timestamps differ
+        await Task.Delay(100);
+
+        var response2 = await _client.SendAsync(AuthedRequest(HttpMethod.Post, "/api/keys/generate", token));
+        var key2 = (await response2.Content.ReadFromJsonAsync<ApiKeyResponse>())!;
+
+        Assert.True(key2.GeneratedAt > key1.GeneratedAt);
+    }
+
+    [Fact]
     public async Task Revoke_WithAuth_RemovesApiKey()
     {
         var token = await RegisterAndGetTokenAsync("revoke@example.com", "revoke");
@@ -117,6 +142,7 @@ public class KeysControllerTests : IAsyncLifetime
         var profileResponse = await _client.SendAsync(AuthedRequest(HttpMethod.Get, "/api/auth/me", token));
         var profile = await profileResponse.Content.ReadFromJsonAsync<UserProfileResponse>();
         Assert.False(profile!.HasApiKey);
+        Assert.Null(profile.ApiKeyCreatedAt);
     }
 
     [Fact]

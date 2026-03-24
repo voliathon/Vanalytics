@@ -15,7 +15,7 @@ const tabs: { id: Tab; label: string }[] = [
 ]
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth()
+  const { user, logout, refreshUser } = useAuth()
   const navigate = useNavigate()
   const ffxi = useFfxiFileSystem()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -37,7 +37,6 @@ export default function ProfilePage() {
 
   // API key state
   const [apiKey, setApiKey] = useState<string | null>(null)
-  const [hasKey, setHasKey] = useState(user?.hasApiKey ?? false)
   const [keyLoading, setKeyLoading] = useState(false)
   const [keyError, setKeyError] = useState('')
 
@@ -87,7 +86,7 @@ export default function ProfilePage() {
     try {
       const res = await api<ApiKeyResponse>('/api/keys/generate', { method: 'POST' })
       setApiKey(res.apiKey)
-      setHasKey(true)
+      refreshUser().catch(() => {})
     } catch (err) {
       if (err instanceof ApiError) setKeyError(err.message)
     } finally {
@@ -102,7 +101,7 @@ export default function ProfilePage() {
     try {
       await api('/api/keys', { method: 'DELETE' })
       setApiKey(null)
-      setHasKey(false)
+      refreshUser().catch(() => {})
     } catch (err) {
       if (err instanceof ApiError) setKeyError(err.message)
     } finally {
@@ -249,16 +248,32 @@ export default function ProfilePage() {
             </div>
           )}
 
+          {!apiKey && user.hasApiKey && (
+            <div className="mb-4 rounded bg-gray-800 border border-gray-700 p-3 flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm text-gray-300">
+                Active — created on{' '}
+                {user.apiKeyCreatedAt
+                  ? new Date(user.apiKeyCreatedAt).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                    })
+                  : 'unknown date'}
+              </span>
+            </div>
+          )}
+
           <div className="flex gap-3">
             <button
               onClick={handleGenerateKey}
               disabled={keyLoading}
               className="rounded bg-blue-600 px-4 py-2 text-sm font-medium hover:bg-blue-500 disabled:opacity-50"
             >
-              {hasKey ? 'Regenerate Key' : 'Generate Key'}
+              {apiKey || user.hasApiKey ? 'Regenerate Key' : 'Generate Key'}
             </button>
 
-            {hasKey && (
+            {(apiKey || user.hasApiKey) && (
               <button
                 onClick={handleRevokeKey}
                 disabled={keyLoading}

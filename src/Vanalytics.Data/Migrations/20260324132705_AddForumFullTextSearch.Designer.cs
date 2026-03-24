@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Vanalytics.Data;
 
@@ -11,9 +12,11 @@ using Vanalytics.Data;
 namespace Vanalytics.Data.Migrations
 {
     [DbContext(typeof(VanalyticsDbContext))]
-    partial class VanalyticsDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260324132705_AddForumFullTextSearch")]
+    partial class AddForumFullTextSearch
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -135,9 +138,6 @@ namespace Vanalytics.Data.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("nvarchar(128)");
 
-                    b.Property<DateTimeOffset?>("ApiKeyCreatedAt")
-                        .HasColumnType("datetimeoffset");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -196,50 +196,6 @@ namespace Vanalytics.Data.Migrations
                         .HasFilter("[OAuthProvider] IS NOT NULL AND [OAuthId] IS NOT NULL");
 
                     b.ToTable("Users");
-                });
-
-            modelBuilder.Entity("Soverance.Forum.Models.ForumAttachment", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ContentType")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("FileName")
-                        .IsRequired()
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)");
-
-                    b.Property<long>("FileSize")
-                        .HasColumnType("bigint");
-
-                    b.Property<long?>("PostId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("StoragePath")
-                        .IsRequired()
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<Guid>("UploadedBy")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PostId");
-
-                    b.HasIndex("UploadedBy");
-
-                    b.ToTable("ForumAttachment");
                 });
 
             modelBuilder.Entity("Soverance.Forum.Models.ForumCategory", b =>
@@ -1137,16 +1093,6 @@ namespace Vanalytics.Data.Migrations
                     b.Navigation("SamlConfig");
                 });
 
-            modelBuilder.Entity("Soverance.Forum.Models.ForumAttachment", b =>
-                {
-                    b.HasOne("Soverance.Forum.Models.ForumPost", "Post")
-                        .WithMany("Attachments")
-                        .HasForeignKey("PostId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Post");
-                });
-
             modelBuilder.Entity("Soverance.Forum.Models.ForumPost", b =>
                 {
                     b.HasOne("Soverance.Forum.Models.ForumThread", "Thread")
@@ -1330,8 +1276,6 @@ namespace Vanalytics.Data.Migrations
 
             modelBuilder.Entity("Soverance.Forum.Models.ForumPost", b =>
                 {
-                    b.Navigation("Attachments");
-
                     b.Navigation("Votes");
                 });
 

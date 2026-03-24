@@ -165,6 +165,7 @@ public class AuthController : ControllerBase
             Email = user.Email,
             Username = user.Username,
             HasApiKey = user.ApiKey is not null,
+            ApiKeyCreatedAt = user.ApiKeyCreatedAt,
             Role = user.Role.ToString(),
             OAuthProvider = user.OAuthProvider,
             CreatedAt = user.CreatedAt

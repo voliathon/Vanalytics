@@ -67,6 +67,12 @@ if (!string.IsNullOrEmpty(builder.Configuration["AzureStorage:ConnectionString"]
     builder.Services.AddSingleton<IItemImageStore, AzureBlobItemImageStore>();
 else
     builder.Services.AddSingleton<IItemImageStore, LocalItemImageStore>();
+
+// Forum attachment storage: Azure Blob in production, local filesystem in dev
+if (!string.IsNullOrEmpty(builder.Configuration["AzureStorage:ConnectionString"]))
+    builder.Services.AddSingleton<IForumAttachmentStore, AzureBlobForumAttachmentStore>();
+else
+    builder.Services.AddSingleton<IForumAttachmentStore, LocalForumAttachmentStore>();
 builder.Services.AddHttpClient("PlayOnline", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(15);
@@ -85,6 +91,7 @@ builder.Services.AddHostedService<BazaarStalenessJob>();
 // Forum
 builder.Services.AddForumServices();
 builder.Services.AddScoped<IForumAuthorResolver, VanalyticsForumAuthorResolver>();
+builder.Services.AddScoped<IForumSearchService, ForumSearchService>();
 
 var app = builder.Build();
 
@@ -135,6 +142,25 @@ else
     {
         FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(itemImagesPath),
         RequestPath = "/item-images"
+    });
+}
+
+// Serve forum attachments — redirect to Azure blob URL or serve from local disk
+var azureAttachmentStore = app.Services.GetService<IForumAttachmentStore>() as AzureBlobForumAttachmentStore;
+if (azureAttachmentStore != null)
+{
+    app.MapGet("/forum-attachments/{**path}", (string path) =>
+        Results.Redirect($"{azureAttachmentStore.BaseUrl}/{path}", permanent: false));
+}
+else
+{
+    var forumAttachmentsPath = app.Configuration["ForumAttachments:BasePath"]
+        ?? Path.Combine(AppContext.BaseDirectory, "forum-attachments");
+    Directory.CreateDirectory(forumAttachmentsPath);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(forumAttachmentsPath),
+        RequestPath = "/forum-attachments"
     });
 }
 

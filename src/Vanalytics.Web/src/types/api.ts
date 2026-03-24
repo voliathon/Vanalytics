@@ -23,6 +23,7 @@ export interface UserProfile {
   email: string
   username: string
   hasApiKey: boolean
+  apiKeyCreatedAt: string | null
   role: UserRole
   oAuthProvider: string | null
   createdAt: string
@@ -212,6 +213,28 @@ export interface PaginatedThreads {
 
 export interface PaginatedPosts {
   posts: EnrichedPostResponse[]
+  hasMore: boolean
+}
+
+export interface ForumSearchResult {
+  threadId: number
+  threadTitle: string
+  threadSlug: string
+  categorySlug: string
+  categoryName: string
+  isPinned: boolean
+  isLocked: boolean
+  authorId: string
+  authorUsername: string
+  authorAvatarHash: string | null
+  matchSnippet: string
+  replyCount: number
+  voteCount: number
+  lastPostAt: string
+}
+
+export interface PaginatedSearchResults {
+  results: ForumSearchResult[]
   hasMore: boolean
 }
 

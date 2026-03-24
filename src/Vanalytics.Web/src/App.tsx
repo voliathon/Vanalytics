@@ -27,6 +27,7 @@ import ForumCategoryListPage from './pages/ForumCategoryListPage'
 import ForumThreadListPage from './pages/ForumThreadListPage'
 import ForumThreadPage from './pages/ForumThreadPage'
 import ForumNewThreadPage from './pages/ForumNewThreadPage'
+import ForumSearchPage from './pages/ForumSearchPage'
 
 function SamlCodeHandler() {
   const { samlExchange } = useAuth()
@@ -122,6 +123,7 @@ export default function App() {
 
             {/* Public forum routes */}
             <Route path="/forum" element={<ForumCategoryListPage />} />
+            <Route path="/forum/search" element={<ForumSearchPage />} />
             <Route path="/forum/:categorySlug" element={<ForumThreadListPage />} />
             <Route path="/forum/:categorySlug/new" element={<ProtectedRoute><ForumNewThreadPage /></ProtectedRoute>} />
             <Route path="/forum/:categorySlug/:threadSlug" element={<ForumThreadPage />} />

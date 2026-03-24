@@ -91,28 +91,7 @@ export default function SetupGuidePage() {
           </a>
         </Step>
 
-        <Step number={4} title="Configure Your API Key">
-          <p>
-            Open the settings file at:
-          </p>
-          <CodeBlock>{`Windower4\\addons\\vanalytics\\settings.xml`}</CodeBlock>
-          <p>
-            Paste your API key between the <code className="text-blue-300 bg-gray-800 px-1.5 py-0.5 rounded">&lt;ApiKey&gt;</code> tags:
-          </p>
-          <CodeBlock>{`<settings>
-    <global>
-        <ApiUrl>https://vanalytics.soverance.com</ApiUrl>
-        <ApiKey>YOUR_API_KEY_HERE</ApiKey>
-        <SyncInterval>15</SyncInterval>
-    </global>
-</settings>`}</CodeBlock>
-          <p>
-            The <code className="text-blue-300 bg-gray-800 px-1.5 py-0.5 rounded">SyncInterval</code> is
-            how often (in minutes) the addon will automatically sync. The minimum is 5 minutes.
-          </p>
-        </Step>
-
-        <Step number={5} title="Load the Addon in Windower">
+        <Step number={4} title="Load the Addon in Windower">
           <p>
             Launch FFXI through Windower and log into your character. Then load the addon by typing
             this command in the game chat:
@@ -121,6 +100,16 @@ export default function SetupGuidePage() {
           <p>
             You should see a confirmation message in your chat log. To auto-load the addon every time
             you start Windower, add it to your Windower profile's addon list.
+          </p>
+        </Step>
+
+        <Step number={5} title="Configure Your API Key">
+          <p>
+            Set your API key using the in-game command. Paste your key from Step 2:
+          </p>
+          <CodeBlock>{`//vanalytics apikey YOUR_API_KEY_HERE`}</CodeBlock>
+          <p>
+            The key is saved automatically and persists across sessions. You only need to do this once.
           </p>
         </Step>
 
@@ -149,6 +138,10 @@ export default function SetupGuidePage() {
               </tr>
             </thead>
             <tbody className="text-gray-400">
+              <tr className="border-b border-gray-800">
+                <td className="py-2"><code className="text-blue-300">{'//vanalytics apikey <key>'}</code></td>
+                <td className="py-2">Set your API key (saved across sessions)</td>
+              </tr>
               <tr className="border-b border-gray-800">
                 <td className="py-2"><code className="text-blue-300">{'//vanalytics sync'}</code></td>
                 <td className="py-2">Sync your character data immediately</td>
@@ -183,7 +176,7 @@ export default function SetupGuidePage() {
                 <AuthLink to="/profile?tab=apikeys" className="text-blue-400 hover:underline">
                   Profile &gt; API Keys
                 </AuthLink>{' '}
-                tab and update your settings.xml.
+                tab and set it with <code className="text-blue-300 bg-gray-800 px-1.5 py-0.5 rounded">{'//vanalytics apikey <new-key>'}</code>.
               </dd>
             </div>
             <div>
