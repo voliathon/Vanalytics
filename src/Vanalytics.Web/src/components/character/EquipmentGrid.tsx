@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import EquipmentSlot from './EquipmentSlot'
 import ItemPreviewBox from '../economy/ItemPreviewBox'
-import { api } from '../../api/client'
 import type { GearEntry, GameItemDetail } from '../../types/api'
 
 const GRID_LAYOUT: string[][] = [
@@ -14,29 +13,14 @@ const GRID_LAYOUT: string[][] = [
 interface EquipmentGridProps {
   gear: GearEntry[]
   onSlotClick: (slotName: string) => void
+  itemCache: Map<number, GameItemDetail>
 }
 
-export default function EquipmentGrid({ gear, onSlotClick }: EquipmentGridProps) {
+export default function EquipmentGrid({ gear, onSlotClick, itemCache }: EquipmentGridProps) {
   const gearBySlot = new Map(gear.map(g => [g.slot, g]))
-  const [itemCache, setItemCache] = useState<Map<number, GameItemDetail>>(new Map())
   const [hoveredSlot, setHoveredSlot] = useState<string | null>(null)
   const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null)
   const gridRef = useRef<HTMLDivElement>(null)
-
-  // Pre-fetch item details for all equipped items
-  useEffect(() => {
-    const ids = gear.filter(g => g.itemId > 0).map(g => g.itemId)
-    const uncached = ids.filter(id => !itemCache.has(id))
-    if (uncached.length === 0) return
-
-    uncached.forEach(id => {
-      api<GameItemDetail>(`/api/items/${id}`)
-        .then(item => {
-          setItemCache(prev => new Map(prev).set(id, item))
-        })
-        .catch(() => {})
-    })
-  }, [gear])
 
   const handleSlotHover = (slotName: string, element: HTMLElement | null) => {
     if (!element || !gridRef.current) {

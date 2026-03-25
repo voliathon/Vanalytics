@@ -31,6 +31,10 @@ export function useAnimationPlayback({
   const loggedRef = useRef(false)
 
   useFrame((_, delta) => {
+    // DEBUG: log why we're not animating
+    if (!loggedRef.current && (!skeleton || !bindPose || animations.length === 0)) {
+      console.log('[AnimPlayback] guard:', 'skeleton:', !!skeleton, 'bindPose:', !!bindPose, 'anims:', animations.length)
+    }
     if (!skeleton || !bindPose || animations.length === 0) return
     if (SKIP_ANIMATION) return
 

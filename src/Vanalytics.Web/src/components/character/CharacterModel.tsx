@@ -222,6 +222,7 @@ export default function CharacterModel({
 
   // Load animation DATs when animationPaths changes
   useEffect(() => {
+    console.log('[CharModel] animationPaths changed:', animationPaths?.length ?? 0, 'paths:', animationPaths?.slice(0, 3))
     if (!animationPaths || animationPaths.length === 0) {
       setAnimations([])
       return
@@ -235,12 +236,18 @@ export default function CharacterModel({
         if (!cached) {
           try {
             const buffer = await readFile(path)
-            cached = parseAnimationDat(buffer)
+            console.log('[CharModel] parsing anim DAT:', path, 'size:', buffer.byteLength)
+            cached = parseAnimationDat(buffer, path)
+            console.log('[CharModel] parsed:', cached.length, 'sections from', path)
             animCache.set(cacheKey, cached)
-          } catch { continue }
+          } catch (err) {
+            console.warn('[CharModel] failed to load anim:', path, err)
+            continue
+          }
         }
         allAnims.push(...cached)
       }
+      console.log('[CharModel] total animation sections loaded:', allAnims.length)
       if (!cancelled) setAnimations(allAnims)
     }
     loadAnims()

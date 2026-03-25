@@ -137,6 +137,8 @@ function calcSubHP(grade: number, level: number): number {
   const s = HP_SCALE[grade]
   const subOver10 = clamp(level - 10, 0, 20)
   const subOver30 = level >= 30 ? level - 30 : 0
+  // The bare subOver30 + subOver10 are flat per-level bonuses from LandSandBoat charutils.cpp,
+  // separate from the scale table's scaleOver30 multiplier. All halved for sub job.
   return Math.floor((s[0] + s[1] * (level - 1) + s[2] * subOver30 + subOver30 + subOver10) / 2)
 }
 
@@ -214,7 +216,8 @@ export function calculateBaseStats(
   const subGrades = subJob ? JOB_GRADES[subJob] : null
   const sLvl = Math.min(subJobLevel, Math.floor(mainLevel / 2))
 
-  // HP
+  // HP — bonus HP is a flat per-level addition from LandSandBoat charutils.cpp:
+  // (level-10) for levels 10+ plus (level-50) clamped to 0-10, all multiplied by 2
   const bonusHP = (mainLevel >= 10 ? mainLevel - 10 : 0) + clamp(mainLevel - 50, 0, 10)
   result.hp = calcHP(raceGrades[0], mainLevel) + calcHP(jobGrades[0], mainLevel) + bonusHP * 2
   if (subGrades) result.hp += calcSubHP(subGrades[0], sLvl)
@@ -368,6 +371,11 @@ interface StatusPanelProps {
   itemCache: Map<number, GameItemDetail>
 }
 
+/** Check whether all equipped items have been loaded into the cache */
+function isGearLoaded(gear: GearEntry[], itemCache: Map<number, GameItemDetail>): boolean {
+  return gear.every(g => g.itemId <= 0 || itemCache.has(g.itemId))
+}
+
 function sumGearStat(gear: GearEntry[], itemCache: Map<number, GameItemDetail>, statKey: string): number {
   let total = 0
   for (const g of gear) {
@@ -389,13 +397,14 @@ export default function StatusPanel({ character, gear, itemCache }: StatusPanelP
   const subJob = character.subJob
   const subLevel = character.subJobLevel ?? 0
 
-  const baseStats = calculateBaseStats(
-    character.race, character.gender,
-    mainJob, mainLevel,
-    subJob, subLevel,
-  )
+  // Can we calculate base stats? Requires race + active job
+  const canCalcBase = !!character.race && !!mainJob
+  const baseStats = canCalcBase
+    ? calculateBaseStats(character.race, character.gender, mainJob, mainLevel, subJob, subLevel)
+    : null
 
   const merits = character.merits ?? {}
+  const gearLoaded = isGearLoaded(gear, itemCache)
 
   return (
     <div>
@@ -418,16 +427,18 @@ export default function StatusPanel({ character, gear, itemCache }: StatusPanelP
       {activeTab === 'Base' && (
         <div className="space-y-1">
           {STAT_KEYS.map(key => {
-            const base = baseStats[key]
+            const base = baseStats ? baseStats[key] : null
             const meritVal = merits[MERIT_STAT_KEYS[key]] ?? 0
-            const equipVal = sumGearStat(gear, itemCache, key)
-            const bonus = meritVal + equipVal
+            const equipVal = gearLoaded ? sumGearStat(gear, itemCache, key) : null
+            const bonus = equipVal != null ? meritVal + equipVal : null
             return (
               <div key={key} className="flex items-center text-sm font-mono">
                 <span className="w-10 text-gray-400 uppercase">{key}</span>
-                <span className="w-16 text-right text-gray-200">{base}</span>
-                <span className={`w-16 text-right ${bonus > 0 ? 'text-green-400' : bonus < 0 ? 'text-red-400' : 'text-gray-500'}`}>
-                  {bonus > 0 ? `+${bonus}` : bonus < 0 ? `${bonus}` : '—'}
+                <span className="w-16 text-right text-gray-200">
+                  {base != null ? base : '—'}
+                </span>
+                <span className={`w-16 text-right ${bonus != null && bonus > 0 ? 'text-green-400' : bonus != null && bonus < 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                  {bonus == null ? '—' : bonus > 0 ? `+${bonus}` : bonus < 0 ? `${bonus}` : '—'}
                 </span>
               </div>
             )
@@ -437,7 +448,9 @@ export default function StatusPanel({ character, gear, itemCache }: StatusPanelP
 
       {activeTab === 'Combat' && (
         <div className="space-y-1">
-          {COMBAT_STATS.map(({ key, label }) => {
+          {!gearLoaded ? (
+            <p className="text-sm text-gray-500 text-center py-4">Loading...</p>
+          ) : COMBAT_STATS.map(({ key, label }) => {
             const total = sumGearStat(gear, itemCache, key)
             if (total === 0) return null
             return (

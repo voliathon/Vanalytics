@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../api/client'
-import type { CharacterDetail, GearEntry, GameItemSummary } from '../types/api'
+import type { CharacterDetail, GearEntry, GameItemSummary, GameItemDetail } from '../types/api'
 import JobsGrid from '../components/JobsGrid'
 import CraftingTable from '../components/CraftingTable'
 import ModelViewer from '../components/character/ModelViewer'
 import { useSlotDatPaths, toRaceId } from '../lib/model-mappings'
 import EquipmentGrid from '../components/character/EquipmentGrid'
+import StatusPanel from '../components/character/StatusPanel'
 import EquipmentSwapModal from '../components/character/EquipmentSwapModal'
 import FullscreenViewer from '../components/character/FullscreenViewer'
 
@@ -21,6 +22,7 @@ export default function CharacterDetailPage() {
   const [fullscreen, setFullscreen] = useState(false)
   const [localGear, setLocalGear] = useState<GearEntry[]>([])
   const [activeTab, setActiveTab] = useState<StatTab>('Jobs')
+  const [itemCache, setItemCache] = useState<Map<number, GameItemDetail>>(new Map())
 
   useEffect(() => {
     api<CharacterDetail>(`/api/characters/${id}`)
@@ -32,6 +34,20 @@ export default function CharacterDetailPage() {
   useEffect(() => {
     if (character?.gear) setLocalGear(character.gear)
   }, [character?.gear])
+
+  // Pre-fetch item details for all equipped items
+  useEffect(() => {
+    const ids = localGear.filter(g => g.itemId > 0).map(g => g.itemId)
+    const uncached = ids.filter(id => !itemCache.has(id))
+    if (uncached.length === 0) return
+    uncached.forEach(id => {
+      api<GameItemDetail>(`/api/items/${id}`)
+        .then(item => {
+          setItemCache(prev => new Map(prev).set(id, item))
+        })
+        .catch(() => {})
+    })
+  }, [localGear])
 
   const raceId = toRaceId(character?.race, character?.gender)
   const { slotDatPaths } = useSlotDatPaths(localGear, raceId, character?.faceModelId)
@@ -90,24 +106,38 @@ export default function CharacterDetailPage() {
       </div>
 
       <section className="mb-8">
-        <div className="flex gap-1 border-b border-gray-700 mb-4">
-          {STAT_TABS.map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                activeTab === tab
-                  ? 'text-blue-400 border-b-2 border-blue-400 -mb-px'
-                  : 'text-gray-500 hover:text-gray-300'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-        <div>
-          {activeTab === 'Jobs' && <JobsGrid jobs={character.jobs} />}
-          {activeTab === 'Crafting' && <CraftingTable skills={character.craftingSkills} />}
+        <div className="flex gap-8">
+          {/* Left column: Jobs / Crafting */}
+          <div className="flex-1 min-w-0">
+            <div className="flex gap-1 border-b border-gray-700 mb-4">
+              {STAT_TABS.map(tab => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    activeTab === tab
+                      ? 'text-blue-400 border-b-2 border-blue-400 -mb-px'
+                      : 'text-gray-500 hover:text-gray-300'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <div>
+              {activeTab === 'Jobs' && <JobsGrid jobs={character.jobs} />}
+              {activeTab === 'Crafting' && <CraftingTable skills={character.craftingSkills} />}
+            </div>
+          </div>
+
+          {/* Right column: Status panel */}
+          <div className="w-72 flex-shrink-0">
+            <StatusPanel
+              character={character}
+              gear={localGear}
+              itemCache={itemCache}
+            />
+          </div>
         </div>
       </section>
 
@@ -125,6 +155,7 @@ export default function CharacterDetailPage() {
             <EquipmentGrid
               gear={localGear}
               onSlotClick={(slot) => setSwapSlot(slot)}
+              itemCache={itemCache}
             />
           </div>
         </div>

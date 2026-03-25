@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Scalar.AspNetCore;
@@ -76,6 +77,7 @@ builder.Services.AddSingleton<VanadielClock>();
 builder.Services.AddScoped<OAuthService>();
 builder.Services.AddSingleton<RateLimiter>();
 builder.Services.AddSingleton<EconomyRateLimiter>();
+builder.Services.AddSingleton<LoginRateLimiter>();
 
 // Item image storage: Azure Blob in production, local filesystem in dev
 if (!string.IsNullOrEmpty(builder.Configuration["AzureStorage:ConnectionString"]))
@@ -129,6 +131,22 @@ using (var scope = app.Services.CreateScope())
         await AdminSeeder.SeedAsync(db, adminEmail, adminUsername, adminPassword, logger);
     }
 
+}
+
+// Forward proxy headers so RemoteIpAddress reflects the real client IP.
+// Required behind Cloudflare + Azure Container Apps, which both set X-Forwarded-For.
+// In production, KnownProxies/KnownNetworks are cleared to trust all forwarders —
+// safe because Azure Container Apps only exposes the container via its own ingress.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseForwardedHeaders(new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+        // Clear defaults so all proxy IPs in the chain are trusted.
+        // Azure Container Apps + Cloudflare don't have fixed IPs to whitelist.
+        KnownProxies = { },
+        KnownIPNetworks = { },
+    });
 }
 
 // Global error handling — catches unhandled exceptions and returns clean JSON

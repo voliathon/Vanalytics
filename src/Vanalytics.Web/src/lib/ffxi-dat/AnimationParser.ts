@@ -3,8 +3,7 @@ import type { ParsedAnimation, AnimationBone } from './types'
 
 const BLOCK_ANIM = 0x2B
 const DATHEAD_SIZE = 8
-// NOTE: Animation blocks (0x2B) have NO extra padding after the DATHEAD.
-// This differs from texture (0x20) and mesh (0x2A) blocks which have 8 bytes of padding.
+const BLOCK_PADDING = 8 // 8 bytes of zeros after DATHEAD, same as other block types
 const DAT2B_HEADER_SIZE = 10
 const DAT2B_BONE_SIZE = 84
 
@@ -13,9 +12,10 @@ const DAT2B_BONE_SIZE = 84
  * Returns one ParsedAnimation per 0x2B block found (typically 1-3 per DAT
  * for the upper/lower/additional body sections).
  */
-export function parseAnimationDat(buffer: ArrayBuffer): ParsedAnimation[] {
+export function parseAnimationDat(buffer: ArrayBuffer, debugPath?: string): ParsedAnimation[] {
   const reader = new DatReader(buffer)
   const animations: ParsedAnimation[] = []
+  const blockTypes = new Map<number, number>()
 
   let offset = 0
   while (offset < reader.length - DATHEAD_SIZE) {
@@ -26,18 +26,36 @@ export function parseAnimationDat(buffer: ArrayBuffer): ParsedAnimation[] {
     const nextUnits = (packed >> 7) & 0x7FFFF
     const blockSize = nextUnits * 16
 
+    blockTypes.set(type, (blockTypes.get(type) ?? 0) + 1)
+
     if (type === BLOCK_ANIM) {
       try {
-        const dataStart = offset + DATHEAD_SIZE
-        const dataLength = Math.max(0, blockSize - DATHEAD_SIZE)
+        const dataStart = offset + DATHEAD_SIZE + BLOCK_PADDING
+        const dataLength = Math.max(0, blockSize - DATHEAD_SIZE - BLOCK_PADDING)
+        // DEBUG: log first few 0x2B block headers
+        if (animations.length === 0 && debugPath && blockTypes.get(BLOCK_ANIM)! <= 3) {
+          const r = new DatReader(buffer)
+          r.seek(dataStart)
+          const raw = Array.from({ length: 16 }, () => r.readUint8())
+          console.log(`[AnimParser] 0x2B block at offset=${offset} blockSize=${blockSize} dataStart=${dataStart} raw header bytes:`, raw)
+        }
         const anim = parseAnimBlock(buffer, dataStart, dataLength)
         if (anim) animations.push(anim)
-      } catch { /* skip malformed block */ }
+      } catch (err) {
+        if (debugPath) console.warn(`[AnimParser] parseAnimBlock error:`, err)
+      }
     }
 
     if (nextUnits === 0) break
     offset += blockSize
     if (offset > reader.length) break
+  }
+
+  if (debugPath && animations.length === 0) {
+    const types = Array.from(blockTypes.entries())
+      .map(([t, c]) => `0x${t.toString(16)}:${c}`)
+      .join(' ')
+    console.log(`[AnimParser] ${debugPath}: no 0x2B blocks. Found types: ${types}`)
   }
 
   return animations
@@ -67,8 +85,17 @@ function parseAnimBlock(
     buffer.slice(dataStart, dataStart + dataLength),
   )
 
+  // DEBUG: log first parse
+  const shouldLog = typeof window !== 'undefined' && !(window as unknown as Record<string, unknown>).__animParsed
+  if (shouldLog) {
+    ;(window as unknown as Record<string, unknown>).__animParsed = true
+    console.log(`[AnimParser] header: element=${element} frame=${frameCount} speed=${speed} dataLen=${dataLength} floatPoolSize=${floatView.length}`)
+    console.log(`[AnimParser] metadata size: ${DAT2B_HEADER_SIZE + element * DAT2B_BONE_SIZE} bytes = ${(DAT2B_HEADER_SIZE + element * DAT2B_BONE_SIZE) / 4} floats`)
+  }
+
   // Read DAT2B bone descriptors (84 bytes each)
   const bones: AnimationBone[] = []
+  let loggedBone = false
   for (let i = 0; i < element; i++) {
     const boneOffset = dataStart + DAT2B_HEADER_SIZE + i * DAT2B_BONE_SIZE
     reader.seek(boneOffset)
@@ -103,6 +130,15 @@ function parseAnimBlock(
 
     // Skip flag: high bit of idx_qtx means no animation for this bone
     if (idx_qtx & 0x80000000) continue
+
+    // DEBUG: log first non-skipped bone's idx values
+    if (shouldLog && !loggedBone) {
+      loggedBone = true
+      console.log(`[AnimParser] bone[${i}] idx=${boneIndex} idx_qtx=${idx_qtx} idx_qty=${idx_qty} idx_qtz=${idx_qtz} idx_qtw=${idx_qtw}`)
+      console.log(`  defaults: rot=[${qtx},${qty},${qtz},${qtw}] trans=[${tx},${ty},${tz}]`)
+      console.log(`  pool[idx_qtx]=${idx_qtx > 0 ? floatView[idx_qtx] : 'N/A'} pool[idx_qtx+1]=${idx_qtx > 0 ? floatView[idx_qtx + 1] : 'N/A'}`)
+      console.log(`  idx_tx=${idx_tx} idx_ty=${idx_ty} idx_tz=${idx_tz}`)
+    }
 
     // Extract keyframe arrays from the float pool
     const rotKf = extractRotationKeyframes(floatView, idx_qtx, idx_qty, idx_qtz, idx_qtw, frameCount)
