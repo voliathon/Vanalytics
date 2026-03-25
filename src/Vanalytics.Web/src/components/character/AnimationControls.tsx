@@ -25,6 +25,9 @@ interface AnimationControlsProps {
   onSeek: (frame: number) => void
   onStepBack: () => void
   onStepForward: () => void
+  motionCount: number
+  motionIndex: number
+  onMotionIndexChange: (index: number) => void
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 1.0, 1.5, 2.0]
@@ -34,6 +37,7 @@ export default function AnimationControls({
   playing, speed,
   onAnimationSelect, onPlayPause, onSpeedChange, onSeek,
   onStepBack, onStepForward,
+  motionCount, motionIndex, onMotionIndexChange,
 }: AnimationControlsProps) {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedAnimIndex, setSelectedAnimIndex] = useState(0)
@@ -118,6 +122,23 @@ export default function AnimationControls({
         <span className="text-xs text-gray-400 w-16 text-right tabular-nums">
           {currentFrame}/{totalFrames}
         </span>
+
+        {/* Motion stepper */}
+        {motionCount > 0 && (
+          <div className="flex items-center gap-1 text-xs text-gray-400" title="Motion within this animation DAT">
+            <button
+              onClick={() => onMotionIndexChange(Math.max(0, motionIndex - 1))}
+              disabled={motionIndex <= 0}
+              className="px-1 hover:text-gray-200 disabled:opacity-30"
+            >&lt;</button>
+            <span className="tabular-nums whitespace-nowrap">M {motionIndex + 1}/{motionCount}</span>
+            <button
+              onClick={() => onMotionIndexChange(Math.min(motionCount - 1, motionIndex + 1))}
+              disabled={motionIndex >= motionCount - 1}
+              className="px-1 hover:text-gray-200 disabled:opacity-30"
+            >&gt;</button>
+          </div>
+        )}
 
         {/* Speed */}
         <select

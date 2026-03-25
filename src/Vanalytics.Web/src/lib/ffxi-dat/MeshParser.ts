@@ -337,12 +337,16 @@ function expandFaces(
   reverseWinding: boolean,
   perVertexBoneIndices?: Uint8Array,
   perVertexBoneWeights?: Float32Array,
+  dualBone?: { localPos1: Float32Array; localPos2: Float32Array; weights: Float32Array } | null,
 ): {
   positions: Float32Array
   normals: Float32Array
   uvs: Float32Array
   boneIndices: Uint8Array
   boneWeights: Float32Array
+  dualBoneLocalPos1?: Float32Array
+  dualBoneLocalPos2?: Float32Array
+  dualBoneWeights?: Float32Array
 } {
   const n = faces.length * 3
   const positions = new Float32Array(n * 3)
@@ -350,6 +354,15 @@ function expandFaces(
   const uvs = new Float32Array(n * 2)
   const boneIndices = new Uint8Array(n * 4)
   const boneWeights = new Float32Array(n * 4)
+
+  let dbLocalPos1: Float32Array | undefined
+  let dbLocalPos2: Float32Array | undefined
+  let dbWeights: Float32Array | undefined
+  if (dualBone) {
+    dbLocalPos1 = new Float32Array(n * 3)
+    dbLocalPos2 = new Float32Array(n * 3)
+    dbWeights = new Float32Array(n * 2)
+  }
 
   for (let f = 0; f < faces.length; f++) {
     const face = faces[f]
@@ -386,10 +399,21 @@ function expandFaces(
         boneWeights[idx * 4 + 2] = perVertexBoneWeights[srcIdx * 4 + 2]
         boneWeights[idx * 4 + 3] = perVertexBoneWeights[srcIdx * 4 + 3]
       }
+
+      if (dualBone && dbLocalPos1 && dbLocalPos2 && dbWeights) {
+        dbLocalPos1[idx*3] = dualBone.localPos1[srcIdx*3]
+        dbLocalPos1[idx*3+1] = dualBone.localPos1[srcIdx*3+1]
+        dbLocalPos1[idx*3+2] = dualBone.localPos1[srcIdx*3+2]
+        dbLocalPos2[idx*3] = dualBone.localPos2[srcIdx*3]
+        dbLocalPos2[idx*3+1] = dualBone.localPos2[srcIdx*3+1]
+        dbLocalPos2[idx*3+2] = dualBone.localPos2[srcIdx*3+2]
+        dbWeights[idx*2] = dualBone.weights[srcIdx*2]
+        dbWeights[idx*2+1] = dualBone.weights[srcIdx*2+1]
+      }
     }
   }
 
-  return { positions, normals, uvs, boneIndices, boneWeights }
+  return { positions, normals, uvs, boneIndices, boneWeights, dualBoneLocalPos1: dbLocalPos1, dualBoneLocalPos2: dbLocalPos2, dualBoneWeights: dbWeights }
 }
 
 /**
@@ -419,20 +443,83 @@ function buildSkinningArrays(
     }
   }
 
-  // MV2 vertices: dual bone — assign to DOMINANT bone (higher weight).
-  // FFXI stores different positions per bone (x1,y1,z1 / x2,y2,z2) which
-  // is incompatible with standard GPU skinning. V1 uses dominant bone only.
+  // MV2 vertices: dual bone — store BOTH bone indices for CPU skinning.
+  // Slot 0 = low bone (leftL/rightL), slot 1 = high bone (leftH/rightH).
   for (let i = 0; i < noB2; i++) {
     const bIdx = noB1 + i
     if (bIdx < boneAssign.length) {
       const b3 = boneAssign[bIdx]
       const tblIdxL = flip ? b3.rightL : b3.leftL
-      boneIndices[bIdx * 4] = resolveBoneIdx(tblIdxL, boneTbl, isIndirect)
-      boneWeights[bIdx * 4] = 1.0 // dominant bone gets full weight
+      const tblIdxH = flip ? b3.rightH : b3.leftH
+      boneIndices[bIdx * 4 + 0] = resolveBoneIdx(tblIdxL, boneTbl, isIndirect)
+      boneIndices[bIdx * 4 + 1] = resolveBoneIdx(tblIdxH, boneTbl, isIndirect)
+      boneWeights[bIdx * 4 + 0] = 1.0
+      boneWeights[bIdx * 4 + 1] = 1.0
     }
   }
 
   return { boneIndices, boneWeights }
+}
+
+/**
+ * Build per-vertex bone-local position and weight arrays for dual-bone (MV2) CPU skinning.
+ * Returns null if there are no MV2 vertices (no dual-bone blending needed).
+ *
+ * When flip=true (mirror half), applies mirror flags from boneAssign to the local positions.
+ * In galkareeve: `matrixMirrorX * boneMatrix` is equivalent to negating the vertex's X axis
+ * before transforming by the original matrix (row-vector convention: v * mirrorX * M = (-vx,vy,vz) * M).
+ */
+function buildDualBoneArrays(
+  noB1: number, noB2: number,
+  mv1Data: Array<{ x: number; y: number; z: number }>,
+  mv2Data: RawMV2[],
+  boneAssign: BoneAssign[],
+  flip: boolean,
+): { localPos1: Float32Array; localPos2: Float32Array; weights: Float32Array } | null {
+  if (noB2 === 0) return null  // no MV2 vertices, skip
+
+  const total = noB1 + noB2
+  const localPos1 = new Float32Array(total * 3)
+  const localPos2 = new Float32Array(total * 3)  // zeros for MV1
+  const weights = new Float32Array(total * 2)
+
+  // MV1: bone-local position in slot 1, weight = (1, 0)
+  for (let i = 0; i < noB1; i++) {
+    let x = mv1Data[i].x, y = mv1Data[i].y, z = mv1Data[i].z
+    if (flip && i < boneAssign.length) {
+      const flg = boneAssign[i].flgL
+      if (flg === 1) x = -x
+      else if (flg === 2) y = -y
+      else if (flg === 3) z = -z
+    }
+    localPos1[i*3] = x; localPos1[i*3+1] = y; localPos1[i*3+2] = z
+    weights[i*2] = 1.0
+    weights[i*2+1] = 0.0
+  }
+
+  // MV2: two bone-local positions + weights
+  for (let i = 0; i < noB2; i++) {
+    const idx = noB1 + i
+    const src = mv2Data[i]
+    let x1 = src.x1, y1 = src.y1, z1 = src.z1
+    let x2 = src.x2, y2 = src.y2, z2 = src.z2
+    if (flip && idx < boneAssign.length) {
+      const b3 = boneAssign[idx]
+      // Mirror bone 1's local position by flgL
+      if (b3.flgL === 1) x1 = -x1
+      else if (b3.flgL === 2) y1 = -y1
+      else if (b3.flgL === 3) z1 = -z1
+      // Mirror bone 2's local position by flgH
+      if (b3.flgH === 1) x2 = -x2
+      else if (b3.flgH === 2) y2 = -y2
+      else if (b3.flgH === 3) z2 = -z2
+    }
+    localPos1[idx*3] = x1; localPos1[idx*3+1] = y1; localPos1[idx*3+2] = z1
+    localPos2[idx*3] = x2; localPos2[idx*3+1] = y2; localPos2[idx*3+2] = z2
+    weights[idx*2] = src.w1; weights[idx*2+1] = src.w2
+  }
+
+  return { localPos1, localPos2, weights }
 }
 
 export function parseVertexBlock(
@@ -535,12 +622,16 @@ export function parseVertexBlock(
     // The shader does: newBoneWorld * inverseBind * v_bindWorld, which in bind pose = identity.
     const origVerts = transformVertices(noB1, noB2, mv1Data, mv2Data, boneAssign, boneTbl, skelMatrices, false, isIndirect)
     const skin = buildSkinningArrays(noB1, noB2, boneAssign, boneTbl, isIndirect, false)
-    const orig = expandFaces(origVerts, faces, false, skin.boneIndices, skin.boneWeights)
+    const dualBone = buildDualBoneArrays(noB1, noB2, mv1Data, mv2Data, boneAssign, false)
+    const orig = expandFaces(origVerts, faces, false, skin.boneIndices, skin.boneWeights, dualBone)
     meshes.push({
       vertices: orig.positions, normals: orig.normals, uvs: orig.uvs,
       indices: new Uint16Array(orig.positions.length / 3),
       boneIndices: orig.boneIndices, boneWeights: orig.boneWeights,
       materialIndex,
+      dualBoneLocalPos1: orig.dualBoneLocalPos1,
+      dualBoneLocalPos2: orig.dualBoneLocalPos2,
+      dualBoneWeights: orig.dualBoneWeights,
     })
 
     // Mirrored half — pre-baked to world space with mirrored bone matrices,
@@ -548,14 +639,22 @@ export function parseVertexBlock(
     // At bind pose: inverseBind * bind = identity, so mirror positions are preserved.
     // During animation: both halves move together (correct for symmetric anims).
     if (hdr.flip !== 0) {
+      const hasDualBone = noB2 > 0
       const mirrorVerts = transformVertices(noB1, noB2, mv1Data, mv2Data, boneAssign, boneTbl, skelMatrices, true, isIndirect)
-      const mirrorSkin = buildSkinningArrays(noB1, noB2, boneAssign, boneTbl, isIndirect, false)
-      const mirror = expandFaces(mirrorVerts, faces, true, mirrorSkin.boneIndices, mirrorSkin.boneWeights)
+      // When dual-bone data exists, the mirror half needs the actual mirror bone indices
+      // (rightL/rightH) because the dual-bone path transforms bone-local positions directly
+      // by world matrices. Without dual-bone, the deformation-matrix approach needs leftL bones.
+      const mirrorSkin = buildSkinningArrays(noB1, noB2, boneAssign, boneTbl, isIndirect, hasDualBone)
+      const mirrorDualBone = buildDualBoneArrays(noB1, noB2, mv1Data, mv2Data, boneAssign, true)
+      const mirror = expandFaces(mirrorVerts, faces, true, mirrorSkin.boneIndices, mirrorSkin.boneWeights, mirrorDualBone)
       meshes.push({
         vertices: mirror.positions, normals: mirror.normals, uvs: mirror.uvs,
         indices: new Uint16Array(mirror.positions.length / 3),
         boneIndices: mirror.boneIndices, boneWeights: mirror.boneWeights,
         materialIndex,
+        dualBoneLocalPos1: mirror.dualBoneLocalPos1,
+        dualBoneLocalPos2: mirror.dualBoneLocalPos2,
+        dualBoneWeights: mirror.dualBoneWeights,
       })
     }
   }

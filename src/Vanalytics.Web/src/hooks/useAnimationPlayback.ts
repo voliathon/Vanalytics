@@ -77,13 +77,8 @@ function quatSlerp(ax: number, ay: number, az: number, aw: number,
 // Set true to bypass animation and verify bind-pose identity deformation
 const DEBUG_FORCE_BIND_POSE = false
 
-// Animation transform interpretation:
-//  'additive'    — Q = animQ * bindQ, T = bindPos + animT  (current, produces large deformations)
-//  'replacement' — Q = animQ, T = animT  (animation provides complete local transform)
-//  'rotOnly'     — Q = animQ * bindQ, T = bindPos  (ignore animation translation entirely)
-const ANIM_MODE: 'additive' | 'replacement' | 'rotOnly' = 'rotOnly'
-
-// Blend factor: 0.0 = bind pose, 1.0 = full animation. Use low values to test formula correctness.
+// Blend factor: 0.0 = pure bind pose, 1.0 = full animation.
+// Use low values to test incrementally: 0.0 → verify bind, 0.1 → slight anim, etc.
 const ANIM_BLEND = 1.0
 
 // --- CPU skinning mesh data ---
@@ -92,6 +87,11 @@ export interface CpuSkinMesh {
   geometry: THREE.BufferGeometry
   origPositions: Float32Array   // bind-pose vertex positions (copy)
   boneIndices: Uint8Array       // 4 bone indices per vertex (uses first)
+  dualBone?: {
+    localPos1: Float32Array   // bone-local positions for bone 1 (3 per vert)
+    localPos2: Float32Array   // bone-local positions for bone 2 (3 per vert)
+    weights: Float32Array     // (w1, w2) per vertex
+  }
 }
 
 interface UseAnimationPlaybackOptions {
@@ -179,49 +179,36 @@ export function useAnimationPlayback({
           mtx = ab.translationDefault[0]; mty = ab.translationDefault[1]; mtz = ab.translationDefault[2]
         }
 
-        // Compute full-strength animated local transform based on ANIM_MODE
-        let fullRx: number, fullRy: number, fullRz: number, fullRw: number
-        let fullTx: number, fullTy: number, fullTz: number
+        // Galkareeve formula: mat[bno] = matBones[bno] * motionMatrix
+        // Where motionMatrix = T(-bindPos) * R(animQ) * T(bindPos + animT)
+        // Combined result: rotation = R(bindQ) * R(animQ), translation = bindT + animT
+        // In quaternion terms: R(A)*R(B) = R(B*A), so combined quat = animQ * bindQ
+        const [rx, ry, rz, rw] = quatMultiply(
+          mqx, mqy, mqz, mqw,
+          bone.rotation[0], bone.rotation[1], bone.rotation[2], bone.rotation[3])
+        const ftx = bone.position[0] + mtx
+        const fty = bone.position[1] + mty
+        const ftz = bone.position[2] + mtz
 
-        if (ANIM_MODE === 'replacement') {
-          // Full replacement: animQ for rotation, animT for position
-          fullRx = mqx; fullRy = mqy; fullRz = mqz; fullRw = mqw
-          fullTx = mtx; fullTy = mty; fullTz = mtz
-        } else if (ANIM_MODE === 'rotOnly') {
-          // Delta rotation in bone-local space: bindQ * animQ
-          // At rest (animQ=identity): bindQ*identity = bindQ ✓ (preserves bind)
-          // During animation: bindQ * smallDelta = bind + perturbation ✓
-          ;[fullRx, fullRy, fullRz, fullRw] = quatMultiply(
-            bone.rotation[0], bone.rotation[1], bone.rotation[2], bone.rotation[3],
-            mqx, mqy, mqz, mqw)  // bindQ first, animQ second
-          fullTx = bone.position[0]; fullTy = bone.position[1]; fullTz = bone.position[2]
+        // Blend between bind pose and animated local transform
+        if (ANIM_BLEND < 1.0) {
+          const br = bone.rotation, bp = bone.position
+          const [brx, bry, brz, brw] = quatSlerp(
+            br[0], br[1], br[2], br[3], rx, ry, rz, rw, ANIM_BLEND)
+          const btx = bp[0] + (ftx - bp[0]) * ANIM_BLEND
+          const bty = bp[1] + (fty - bp[1]) * ANIM_BLEND
+          const btz = bp[2] + (ftz - bp[2]) * ANIM_BLEND
+          localMats[ab.boneIndex] = quatToMatrix(brx, bry, brz, brw, btx, bty, btz)
         } else {
-          // bindQ * animQ + additive translation
-          ;[fullRx, fullRy, fullRz, fullRw] = quatMultiply(
-            bone.rotation[0], bone.rotation[1], bone.rotation[2], bone.rotation[3],
-            mqx, mqy, mqz, mqw)
-          fullTx = bone.position[0] + mtx; fullTy = bone.position[1] + mty; fullTz = bone.position[2] + mtz
+          localMats[ab.boneIndex] = quatToMatrix(rx, ry, rz, rw, ftx, fty, ftz)
         }
-
-        // Blend between bind pose and full animation
-        const br = bone.rotation, bp = bone.position
-        const [rx, ry, rz, rw] = quatSlerp(
-          br[0], br[1], br[2], br[3],
-          fullRx, fullRy, fullRz, fullRw, ANIM_BLEND)
-        const ftx = bp[0] + (fullTx - bp[0]) * ANIM_BLEND
-        const fty = bp[1] + (fullTy - bp[1]) * ANIM_BLEND
-        const ftz = bp[2] + (fullTz - bp[2]) * ANIM_BLEND
-
-        localMats[ab.boneIndex] = quatToMatrix(rx, ry, rz, rw, ftx, fty, ftz)
 
         // One-time diagnostic for first 3 animated bones
         if (!loggedRef.current && debugBonesLogged < 3) {
           debugBonesLogged++
-          const bindQ = bone.rotation
-          const dotQuat = Math.abs(mqx*bindQ[0] + mqy*bindQ[1] + mqz*bindQ[2] + mqw*bindQ[3])
-          console.log(`[CPUSkin] anim bone ${ab.boneIndex}: animQ=(${mqx.toFixed(4)},${mqy.toFixed(4)},${mqz.toFixed(4)},${mqw.toFixed(4)}) bindQ=(${bindQ[0].toFixed(4)},${bindQ[1].toFixed(4)},${bindQ[2].toFixed(4)},${bindQ[3].toFixed(4)}) dot=${dotQuat.toFixed(4)}`)
-          console.log(`  animT=(${mtx.toFixed(4)},${mty.toFixed(4)},${mtz.toFixed(4)}) bindP=(${bone.position[0].toFixed(4)},${bone.position[1].toFixed(4)},${bone.position[2].toFixed(4)})`)
-          console.log(`  combined: Q=(${rx.toFixed(4)},${ry.toFixed(4)},${rz.toFixed(4)},${rw.toFixed(4)}) T=(${(bone.position[0]+mtx).toFixed(4)},${(bone.position[1]+mty).toFixed(4)},${(bone.position[2]+mtz).toFixed(4)})`)
+          console.log(`[CPUSkin] bone ${ab.boneIndex}: animQ=(${mqx.toFixed(4)},${mqy.toFixed(4)},${mqz.toFixed(4)},${mqw.toFixed(4)}) bindQ=(${bone.rotation.map((v: number) => v.toFixed(4)).join(',')})`)
+          console.log(`  animT=(${mtx.toFixed(4)},${mty.toFixed(4)},${mtz.toFixed(4)}) bindP=(${bone.position.map((v: number) => v.toFixed(4)).join(',')})`)
+          console.log(`  result: Q=(${rx.toFixed(4)},${ry.toFixed(4)},${rz.toFixed(4)},${rw.toFixed(4)}) T=(${ftx.toFixed(4)},${fty.toFixed(4)},${ftz.toFixed(4)})`)
         }
       }
     }
@@ -279,7 +266,7 @@ export function useAnimationPlayback({
       loggedRef.current = true
       const animatedBones = new Set<number>()
       for (const a of animations) for (const b of a.bones) animatedBones.add(b.boneIndex)
-      console.log(`[CPUSkin] FORCE_BIND=${DEBUG_FORCE_BIND_POSE} MODE=${ANIM_MODE} | ${boneCount} bones, ${animatedBones.size} animated, ${meshes.length} meshes, ${animations.length} sections`)
+      console.log(`[CPUSkin] FORCE_BIND=${DEBUG_FORCE_BIND_POSE} | ${boneCount} bones, ${animatedBones.size} animated, ${meshes.length} meshes, ${animations.length} sections`)
 
       // Check skeleton bones and find animated ones with non-identity bind rotation
       let nonIdentityCount = 0
@@ -374,28 +361,64 @@ export function useAnimationPlayback({
       }
     }
 
+    // --- Step 3b: Check for NaN/Infinity in deformation matrices (once) ---
+    if (!loggedRef.current) {
+      let nanCount = 0, infCount = 0, hugeCount = 0
+      for (let i = 0; i < deformMats.length; i++) {
+        const dm = deformMats[i]
+        for (let k = 0; k < 16; k++) {
+          if (isNaN(dm[k])) nanCount++
+          else if (!isFinite(dm[k])) infCount++
+          else if (Math.abs(dm[k]) > 100) hugeCount++
+        }
+      }
+      if (nanCount || infCount || hugeCount) {
+        console.error(`[CPUSkin] BAD DEFORM MATRICES: NaN=${nanCount} Inf=${infCount} huge=${hugeCount}`)
+      }
+    }
+
     // --- Step 4: Transform vertices for each mesh ---
-    // Test modes: 0 = no transform (bind pose), 1 = just add translation, 2 = full transform
-    const DEBUG_TRANSFORM: number = 0  // TODO: set to 2 once animation formula is fixed
     for (const mesh of meshes) {
       const posArr = mesh.geometry.attributes.position.array as Float32Array
       const orig = mesh.origPositions
       const bones = mesh.boneIndices
       const vertCount = orig.length / 3
 
-      if (DEBUG_TRANSFORM === 0) {
-        for (let v = 0; v < vertCount * 3; v++) posArr[v] = orig[v]
-      } else if (DEBUG_TRANSFORM === 1) {
-        // Apply ONLY translation from deformation (identity rotation)
+      if (mesh.dualBone) {
+        // Dual-bone path: transform each bone's local position by its world matrix, sum.
+        // MV2 vertices use worldMats directly (not deformMats) because they store
+        // bone-local positions that need D3DXVec4Transform with w-weighted translation.
+        // MV1 vertices in a dual-bone mesh also use worldMats for consistency (w=1).
+        const lp1 = mesh.dualBone.localPos1
+        const lp2 = mesh.dualBone.localPos2
+        const wts = mesh.dualBone.weights
         for (let v = 0; v < vertCount; v++) {
-          const bi = bones[v * 4]
-          if (bi >= deformMats.length) continue
-          const dm = deformMats[bi]
-          posArr[v*3]   = orig[v*3]   + dm[12]
-          posArr[v*3+1] = orig[v*3+1] + dm[13]
-          posArr[v*3+2] = orig[v*3+2] + dm[14]
+          const bi1 = bones[v * 4]
+          const bi2 = bones[v * 4 + 1]
+          const w1 = wts[v * 2], w2 = wts[v * 2 + 1]
+
+          // Bone 1: D3DXVec4Transform(localPos1, w1, worldMats[bi1])
+          const wm1 = (bi1 < worldMats.length) ? worldMats[bi1] : null
+          const wm2 = (bi2 < worldMats.length && w2 > 0) ? worldMats[bi2] : null
+
+          let px = 0, py = 0, pz = 0
+          if (wm1) {
+            const x = lp1[v*3], y = lp1[v*3+1], z = lp1[v*3+2]
+            px += x*wm1[0] + y*wm1[4] + z*wm1[8]  + w1*wm1[12]
+            py += x*wm1[1] + y*wm1[5] + z*wm1[9]  + w1*wm1[13]
+            pz += x*wm1[2] + y*wm1[6] + z*wm1[10] + w1*wm1[14]
+          }
+          if (wm2) {
+            const x = lp2[v*3], y = lp2[v*3+1], z = lp2[v*3+2]
+            px += x*wm2[0] + y*wm2[4] + z*wm2[8]  + w2*wm2[12]
+            py += x*wm2[1] + y*wm2[5] + z*wm2[9]  + w2*wm2[13]
+            pz += x*wm2[2] + y*wm2[6] + z*wm2[10] + w2*wm2[14]
+          }
+
+          posArr[v*3] = px; posArr[v*3+1] = py; posArr[v*3+2] = pz
         }
       } else {
+        // Single-bone path: use deformation matrices (existing approach)
         for (let v = 0; v < vertCount; v++) {
           const bi = bones[v * 4]
           if (bi >= deformMats.length) continue
@@ -404,6 +427,29 @@ export function useAnimationPlayback({
           posArr[v*3]   = dm[0]*ox + dm[4]*oy + dm[8]*oz  + dm[12]
           posArr[v*3+1] = dm[1]*ox + dm[5]*oy + dm[9]*oz  + dm[13]
           posArr[v*3+2] = dm[2]*ox + dm[6]*oy + dm[10]*oz + dm[14]
+        }
+      }
+
+      // Post-transform: check for extreme vertex positions (once per mesh, first frame only)
+      if (!loggedRef.current) {
+        let maxDist = 0, maxV = -1, nanVerts = 0
+        for (let v = 0; v < vertCount; v++) {
+          const px = posArr[v*3], py = posArr[v*3+1], pz = posArr[v*3+2]
+          if (isNaN(px) || isNaN(py) || isNaN(pz)) { nanVerts++; continue }
+          const dist = Math.sqrt(px*px + py*py + pz*pz)
+          if (dist > maxDist) { maxDist = dist; maxV = v }
+        }
+        if (nanVerts > 0 || maxDist > 5) {
+          const bi = maxV >= 0 ? bones[maxV * 4] : -1
+          console.error(`[CPUSkin] MESH PROBLEM: verts=${vertCount} nanVerts=${nanVerts} maxDist=${maxDist.toFixed(2)} at v${maxV}(bone${bi})`)
+          if (maxV >= 0) {
+            const ox = orig[maxV*3], oy = orig[maxV*3+1], oz = orig[maxV*3+2]
+            console.error(`  orig=(${ox.toFixed(3)},${oy.toFixed(3)},${oz.toFixed(3)}) new=(${posArr[maxV*3].toFixed(3)},${posArr[maxV*3+1].toFixed(3)},${posArr[maxV*3+2].toFixed(3)}) bone=${bi}`)
+            if (bi < deformMats.length) {
+              const dm = deformMats[bi]
+              console.error(`  deform=[${dm.slice(0,4).map((v: number) => v.toFixed(3)).join(',')};${dm.slice(4,8).map((v: number) => v.toFixed(3)).join(',')};${dm.slice(8,12).map((v: number) => v.toFixed(3)).join(',')};${dm.slice(12).map((v: number) => v.toFixed(3)).join(',')}]`)
+            }
+          }
         }
       }
 

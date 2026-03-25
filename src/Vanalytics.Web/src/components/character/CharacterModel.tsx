@@ -19,7 +19,9 @@ interface CharacterModelProps {
   animationPaths?: string[]
   animationPlaying?: boolean
   animationSpeed?: number
+  motionIndex?: number
   onAnimationFrame?: (frame: number, total: number) => void
+  onMotionCount?: (count: number) => void
   onSeekRef?: (seekFn: (frame: number) => void) => void
   onSlotLoaded?: (slotId: number) => void
   onError?: (slotId: number, error: string) => void
@@ -36,7 +38,9 @@ export default function CharacterModel({
   animationPaths,
   animationPlaying,
   animationSpeed,
+  motionIndex,
   onAnimationFrame,
+  onMotionCount,
   onSeekRef,
   onSlotLoaded,
   onError,
@@ -93,9 +97,11 @@ export default function CharacterModel({
 
         const threeMeshes = parsed.meshes.map((mesh) => {
           const geometry = new THREE.BufferGeometry()
-          geometry.setAttribute('position', new THREE.BufferAttribute(mesh.vertices, 3))
-          geometry.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3))
-          geometry.setAttribute('uv', new THREE.BufferAttribute(mesh.uvs, 2))
+          // IMPORTANT: Copy vertex data so CPU skinning doesn't corrupt the datCache.
+          // The geometry buffer gets modified in-place by useAnimationPlayback each frame.
+          geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(mesh.vertices), 3))
+          geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(mesh.normals), 3))
+          geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(mesh.uvs), 2))
           let material: THREE.Material
           const tex = parsed!.textures[mesh.materialIndex]
           if (tex) {
@@ -120,6 +126,11 @@ export default function CharacterModel({
               geometry,
               origPositions: new Float32Array(mesh.vertices),  // copy of bind-pose positions
               boneIndices: mesh.boneIndices,
+              dualBone: mesh.dualBoneLocalPos1 ? {
+                localPos1: new Float32Array(mesh.dualBoneLocalPos1),
+                localPos2: new Float32Array(mesh.dualBoneLocalPos2!),
+                weights: new Float32Array(mesh.dualBoneWeights!),
+              } : undefined,
             })
           }
 
@@ -198,41 +209,15 @@ export default function CharacterModel({
           return
         }
       }
-      // Log all sections to understand the body-part split
-      for (let i = 0; i < Math.min(sections.length, 5); i++) {
-        const s = sections[i]
-        const boneIdxs = s.bones.slice(0, 5).map(b => b.boneIndex)
-        console.log(`[CharModel] block[${i}]: ${s.frameCount} frames, speed=${s.speed}, ${s.bones.length} bones, first indices=[${boneIdxs}]`)
-      }
-      // DEBUG: Override with idle/breathing animation (ROM/71/99.dat motion 1 = "idl")
-      // Remove this override once animation selection is working
-      const debugAnimPath = 'ROM/71/99.dat'
-      const debugMotionIdx = 1  // 0=id1 (hands on hips), 1=idl (arms by sides, breathing)
-      let debugSections = animCache.get(`anim:${debugAnimPath}`)
-      if (!debugSections) {
-        try {
-          const buf = await readFile(debugAnimPath)
-          debugSections = parseAnimationDat(buf, debugAnimPath)
-          console.log(`[CharModel] DEBUG: parsed ${debugSections.length} blocks from ${debugAnimPath}`)
-          animCache.set(`anim:${debugAnimPath}`, debugSections)
-        } catch (err) {
-          console.warn('[CharModel] DEBUG: failed to load idle anim:', err)
-          debugSections = undefined
-        }
-      }
-      // Skip the original DAT entirely when debug override is active
-      if (debugSections) { sections = debugSections }
       // Group blocks into motions: same frame count + speed, non-overlapping bones
-      const src = debugSections ?? sections
-      const motionGroups: typeof src[] = []
-      let currentGroup: typeof src = []
+      const motionGroups: typeof sections[] = []
+      let currentGroup: typeof sections = []
       let currentBones = new Set<number>()
-      for (let i = 0; i < src.length; i++) {
-        const block = src[i]
+      for (let i = 0; i < sections.length; i++) {
+        const block = sections[i]
         const matchesTiming = currentGroup.length === 0 ||
           (block.frameCount === currentGroup[0].frameCount &&
            Math.abs(block.speed - currentGroup[0].speed) < 0.001)
-        // Check if this block's bones overlap with current group
         const hasOverlap = block.bones.some(b => currentBones.has(b.boneIndex))
 
         if (matchesTiming && !hasOverlap) {
@@ -245,19 +230,19 @@ export default function CharacterModel({
         }
       }
       if (currentGroup.length > 0) motionGroups.push(currentGroup)
-      console.log(`[CharModel] ${motionGroups.length} motions detected:`, motionGroups.map((g, i) =>
+      console.log(`[CharModel] ${motionGroups.length} motions from ${path}:`, motionGroups.map((g, i) =>
         `motion${i}(${g.length}blk, ${g[0].frameCount}fr, ${g.reduce((s, b) => s + b.bones.length, 0)}bones)`
       ).join(', '))
-      // Select motion (debugMotionIdx when overriding, else 0)
-      const motionIdx = debugSections ? debugMotionIdx : 0
-      const clip = motionGroups[motionIdx] ?? motionGroups[0] ?? src.slice(0, 1)
-      console.log(`[CharModel] using motion ${motionIdx}: ${clip.length} blocks, ${clip.reduce((s, b) => s + b.bones.length, 0)} bones`)
-      console.log('[CharModel] using', clip.length, '/', sections.length, 'sections, frames:', clip.map(s => s.frameCount), 'bones:', clip.map(s => s.bones.length))
+      onMotionCount?.(motionGroups.length)
+      // Use the selected motion from this DAT
+      const idx = motionIndex ?? 0
+      const clip = motionGroups[idx] ?? motionGroups[0] ?? sections.slice(0, 1)
+      console.log(`[CharModel] using motion ${idx}: ${clip.length} blocks, ${clip.reduce((s, b) => s + b.bones.length, 0)} bones`)
       if (!cancelled) setAnimations(clip)
     }
     loadAnims()
     return () => { cancelled = true }
-  }, [animationPaths, readFile])
+  }, [animationPaths, readFile, motionIndex])
 
   // CPU skinning animation playback
   const { seekToFrame } = useAnimationPlayback({

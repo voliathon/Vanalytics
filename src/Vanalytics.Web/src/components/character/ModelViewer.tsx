@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Loader2, MonitorSmartphone, FolderOpen, Settings } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useFfxiFileSystem } from '../../context/FfxiFileSystemContext'
@@ -29,7 +29,12 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
   const [animSpeed, setAnimSpeed] = useState(1.0)
   const [animFrame, setAnimFrame] = useState(0)
   const [animTotal, setAnimTotal] = useState(0)
+  const [motionCount, setMotionCount] = useState(0)
+  const [motionIndex, setMotionIndex] = useState(0)
   const seekFnRef = useRef<((frame: number) => void) | null>(null)
+
+  // Reset motion index when animation changes
+  useEffect(() => { setMotionIndex(0) }, [animPaths])
 
   if (loading) return <ViewerShell><Loader2 className="h-6 w-6 animate-spin text-gray-600" /></ViewerShell>
   if (!isSupported) return <ViewerShell><MonitorSmartphone className="h-8 w-8 text-gray-600 mb-2" /><p className="text-sm text-gray-400">3D model viewer requires Chrome or Edge</p></ViewerShell>
@@ -64,7 +69,9 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
             animationPaths={animPaths}
             animationPlaying={animPlaying}
             animationSpeed={animSpeed}
+            motionIndex={motionIndex}
             onAnimationFrame={(f, t) => { setAnimFrame(f); setAnimTotal(t) }}
+            onMotionCount={setMotionCount}
             onSeekRef={(fn) => { seekFnRef.current = fn }}
             onSlotLoaded={(id) => setLoadingSlots(prev => { const next = new Set(prev); next.delete(id); return next })} />
         </CharacterScene>
@@ -86,6 +93,9 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
         onSeek={(f) => seekFnRef.current?.(f)}
         onStepBack={() => seekFnRef.current?.(Math.max(0, animFrame - 1))}
         onStepForward={() => seekFnRef.current?.(Math.min(animTotal - 1, animFrame + 1))}
+        motionCount={motionCount}
+        motionIndex={motionIndex}
+        onMotionIndexChange={setMotionIndex}
       />
     </div>
   )

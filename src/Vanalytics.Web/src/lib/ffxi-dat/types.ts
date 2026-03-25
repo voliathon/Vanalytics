@@ -6,6 +6,12 @@ export interface ParsedMesh {
   boneIndices: Uint8Array
   boneWeights: Float32Array
   materialIndex: number
+  /** Per-vertex bone-local positions for bone 1 (3 floats/vert). Present when mesh has MV2 vertices. */
+  dualBoneLocalPos1?: Float32Array
+  /** Per-vertex bone-local positions for bone 2 (3 floats/vert). Zero for MV1 vertices. */
+  dualBoneLocalPos2?: Float32Array
+  /** Per-vertex weights (2 floats/vert): [w1, w2]. MV1 vertices have [1, 0]. */
+  dualBoneWeights?: Float32Array
 }
 
 export interface ParsedTexture {

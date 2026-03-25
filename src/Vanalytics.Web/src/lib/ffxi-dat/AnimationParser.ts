@@ -117,10 +117,12 @@ function parseAnimBlock(
       console.log(`  defaults: rot=[${qtx},${qty},${qtz},${qtw}] trans=[${tx},${ty},${tz}]`)
     }
 
-    // Extract keyframe arrays from the float pool using DatReader
-    const rotKf = readRotationKeyframes(reader, poolBase, idx_qtx, idx_qty, idx_qtz, idx_qtw, frameCount)
-    const transKf = readTranslationKeyframes(reader, poolBase, idx_tx, idx_ty, idx_tz, frameCount)
-    const scaleKf = readScaleKeyframes(reader, poolBase, idx_sx, idx_sy, idx_sz, frameCount)
+    // Extract keyframe arrays from the float pool using DatReader.
+    // When a component's idx is 0, fill with the stored default (not a hardcoded 0/1).
+    // This matches the galkareeve reference: `if(!dat.idx_qtx) qt.x = dat.qtx;`
+    const rotKf = readRotationKeyframes(reader, poolBase, idx_qtx, idx_qty, idx_qtz, idx_qtw, frameCount, qtx, qty, qtz, qtw)
+    const transKf = readTranslationKeyframes(reader, poolBase, idx_tx, idx_ty, idx_tz, frameCount, tx, ty, tz)
+    const scaleKf = readScaleKeyframes(reader, poolBase, idx_sx, idx_sy, idx_sz, frameCount, sx, sy, sz)
 
     bones.push({
       boneIndex,
@@ -146,15 +148,16 @@ function readRotationKeyframes(
   reader: DatReader, poolBase: number,
   idxX: number, idxY: number, idxZ: number, idxW: number,
   frameCount: number,
+  defX: number, defY: number, defZ: number, defW: number,
 ): Float32Array | null {
   if (idxX === 0 && idxY === 0 && idxZ === 0 && idxW === 0) return null
 
   const kf = new Float32Array(frameCount * 4)
   for (let f = 0; f < frameCount; f++) {
-    kf[f * 4 + 0] = idxX > 0 ? readPoolFloat(reader, poolBase, idxX + f) : 0
-    kf[f * 4 + 1] = idxY > 0 ? readPoolFloat(reader, poolBase, idxY + f) : 0
-    kf[f * 4 + 2] = idxZ > 0 ? readPoolFloat(reader, poolBase, idxZ + f) : 0
-    kf[f * 4 + 3] = idxW > 0 ? readPoolFloat(reader, poolBase, idxW + f) : 1
+    kf[f * 4 + 0] = idxX > 0 ? readPoolFloat(reader, poolBase, idxX + f) : defX
+    kf[f * 4 + 1] = idxY > 0 ? readPoolFloat(reader, poolBase, idxY + f) : defY
+    kf[f * 4 + 2] = idxZ > 0 ? readPoolFloat(reader, poolBase, idxZ + f) : defZ
+    kf[f * 4 + 3] = idxW > 0 ? readPoolFloat(reader, poolBase, idxW + f) : defW
   }
   return kf
 }
@@ -163,14 +166,15 @@ function readTranslationKeyframes(
   reader: DatReader, poolBase: number,
   idxX: number, idxY: number, idxZ: number,
   frameCount: number,
+  defX: number, defY: number, defZ: number,
 ): Float32Array | null {
   if (idxX === 0 && idxY === 0 && idxZ === 0) return null
 
   const kf = new Float32Array(frameCount * 3)
   for (let f = 0; f < frameCount; f++) {
-    kf[f * 3 + 0] = idxX > 0 ? readPoolFloat(reader, poolBase, idxX + f) : 0
-    kf[f * 3 + 1] = idxY > 0 ? readPoolFloat(reader, poolBase, idxY + f) : 0
-    kf[f * 3 + 2] = idxZ > 0 ? readPoolFloat(reader, poolBase, idxZ + f) : 0
+    kf[f * 3 + 0] = idxX > 0 ? readPoolFloat(reader, poolBase, idxX + f) : defX
+    kf[f * 3 + 1] = idxY > 0 ? readPoolFloat(reader, poolBase, idxY + f) : defY
+    kf[f * 3 + 2] = idxZ > 0 ? readPoolFloat(reader, poolBase, idxZ + f) : defZ
   }
   return kf
 }
@@ -179,14 +183,15 @@ function readScaleKeyframes(
   reader: DatReader, poolBase: number,
   idxX: number, idxY: number, idxZ: number,
   frameCount: number,
+  defX: number, defY: number, defZ: number,
 ): Float32Array | null {
   if (idxX === 0 && idxY === 0 && idxZ === 0) return null
 
   const kf = new Float32Array(frameCount * 3)
   for (let f = 0; f < frameCount; f++) {
-    kf[f * 3 + 0] = idxX > 0 ? readPoolFloat(reader, poolBase, idxX + f) : 1
-    kf[f * 3 + 1] = idxY > 0 ? readPoolFloat(reader, poolBase, idxY + f) : 1
-    kf[f * 3 + 2] = idxZ > 0 ? readPoolFloat(reader, poolBase, idxZ + f) : 1
+    kf[f * 3 + 0] = idxX > 0 ? readPoolFloat(reader, poolBase, idxX + f) : defX
+    kf[f * 3 + 1] = idxY > 0 ? readPoolFloat(reader, poolBase, idxY + f) : defY
+    kf[f * 3 + 2] = idxZ > 0 ? readPoolFloat(reader, poolBase, idxZ + f) : defZ
   }
   return kf
 }
