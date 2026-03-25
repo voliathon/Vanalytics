@@ -7,6 +7,7 @@ import CharacterModel from './CharacterModel'
 import AnimationControls from './AnimationControls'
 import { useAnimationDatPaths } from '../../hooks/useAnimationDatPaths'
 import { toRaceId } from '../../lib/model-mappings'
+import { SKELETON_PATHS } from '../../lib/ffxi-dat'
 import type { GearEntry } from '../../types/api'
 
 interface ModelViewerProps {
@@ -23,7 +24,13 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
 
   // Animation state — hooks must be called before any early returns
   const raceId = toRaceId(race, gender)
-  const { groups, loading: animLoading } = useAnimationDatPaths(raceId ?? null)
+  const { groups: datGroups, loading: animLoading } = useAnimationDatPaths(raceId ?? null)
+
+  // Prepend a "Basic" group from the skeleton DAT (contains idle/stance animations)
+  const skelPath = raceId ? SKELETON_PATHS[raceId] : undefined
+  const groups = skelPath
+    ? [{ category: 'Basic', animations: [{ name: 'Idle / Stance', category: 'Basic', paths: [skelPath] }] }, ...datGroups]
+    : datGroups
   const [animPaths, setAnimPaths] = useState<string[]>([])
   const [animPlaying, setAnimPlaying] = useState(true)
   const [animSpeed, setAnimSpeed] = useState(1.0)
@@ -34,7 +41,10 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
   const seekFnRef = useRef<((frame: number) => void) | null>(null)
 
   // Reset motion index when animation changes
-  useEffect(() => { setMotionIndex(0) }, [animPaths])
+  useEffect(() => {
+    if (animPaths.length === 0) return
+    setMotionIndex(0)
+  }, [animPaths])
 
   if (loading) return <ViewerShell><Loader2 className="h-6 w-6 animate-spin text-gray-600" /></ViewerShell>
   if (!isSupported) return <ViewerShell><MonitorSmartphone className="h-8 w-8 text-gray-600 mb-2" /><p className="text-sm text-gray-400">3D model viewer requires Chrome or Edge</p></ViewerShell>

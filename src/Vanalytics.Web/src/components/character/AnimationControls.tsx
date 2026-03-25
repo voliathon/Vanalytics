@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Play, Pause, SkipBack, SkipForward } from 'lucide-react'
 
 interface AnimationEntry {
@@ -41,21 +41,29 @@ export default function AnimationControls({
 }: AnimationControlsProps) {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedAnimIndex, setSelectedAnimIndex] = useState(0)
+  const initialSelectedRef = useRef(false)
 
-  // Auto-select "Battle" category (contains idle animation) or first category
+  // Auto-select "Emote" category (bow animation, consistent across races) or first category
   useEffect(() => {
     if (groups.length > 0 && !selectedCategory) {
-      const battle = groups.find(g => g.category === 'Battle')
-      setSelectedCategory(battle ? battle.category : groups[0].category)
+      const emote = groups.find(g => g.category === 'Emote')
+      setSelectedCategory(emote ? emote.category : groups[0].category)
     }
   }, [groups, selectedCategory])
 
-  // Auto-select first animation and fire callback when category changes
+  // Auto-select animation when category changes
   useEffect(() => {
     const group = groups.find(g => g.category === selectedCategory)
     if (group && group.animations.length > 0) {
-      setSelectedAnimIndex(0)
-      onAnimationSelect(group.animations[0].paths)
+      // On initial Emote selection, find the "Emote" animation entry
+      let idx = 0
+      if (!initialSelectedRef.current && selectedCategory === 'Emote') {
+        const emoteIdx = group.animations.findIndex(a => a.name === 'Emote')
+        if (emoteIdx >= 0) idx = emoteIdx
+        initialSelectedRef.current = true
+      }
+      setSelectedAnimIndex(idx)
+      onAnimationSelect(group.animations[idx].paths)
     }
   }, [selectedCategory]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -74,7 +82,7 @@ export default function AnimationControls({
 
   return (
     <div className="bg-gray-900/80 border border-gray-700/50 rounded-b-md px-3 py-2 space-y-2">
-      {/* Category + Animation pickers */}
+      {/* Category + Animation + Motion pickers */}
       <div className="flex gap-2">
         <select
           value={selectedCategory}
@@ -88,12 +96,24 @@ export default function AnimationControls({
         <select
           value={selectedAnimIndex}
           onChange={e => handleAnimChange(Number(e.target.value))}
-          className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 flex-[2]"
+          className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 flex-1"
         >
           {animations.map((a, i) => (
             <option key={i} value={i}>{a.name}</option>
           ))}
         </select>
+        {motionCount > 0 && (
+          <select
+            value={motionIndex}
+            onChange={e => onMotionIndexChange(Number(e.target.value))}
+            className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 w-28"
+            title="Each animation DAT contains multiple motions (e.g., idle, walk, run)"
+          >
+            {Array.from({ length: motionCount }, (_, i) => (
+              <option key={i} value={i}>Motion {i + 1}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Transport controls */}
@@ -122,23 +142,6 @@ export default function AnimationControls({
         <span className="text-xs text-gray-400 w-16 text-right tabular-nums">
           {currentFrame}/{totalFrames}
         </span>
-
-        {/* Motion stepper */}
-        {motionCount > 0 && (
-          <div className="flex items-center gap-1 text-xs text-gray-400" title="Motion within this animation DAT">
-            <button
-              onClick={() => onMotionIndexChange(Math.max(0, motionIndex - 1))}
-              disabled={motionIndex <= 0}
-              className="px-1 hover:text-gray-200 disabled:opacity-30"
-            >&lt;</button>
-            <span className="tabular-nums whitespace-nowrap">M {motionIndex + 1}/{motionCount}</span>
-            <button
-              onClick={() => onMotionIndexChange(Math.min(motionCount - 1, motionIndex + 1))}
-              disabled={motionIndex >= motionCount - 1}
-              className="px-1 hover:text-gray-200 disabled:opacity-30"
-            >&gt;</button>
-          </div>
-        )}
 
         {/* Speed */}
         <select

@@ -11,6 +11,15 @@ public class SecurityHeadersMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
+        // Skip security headers for Scalar API docs in Development
+        // (Scalar uses inline scripts that CSP would block)
+        var env = context.RequestServices.GetRequiredService<IHostEnvironment>();
+        if (env.IsDevelopment() && context.Request.Path.StartsWithSegments("/api/docs"))
+        {
+            await _next(context);
+            return;
+        }
+
         var headers = context.Response.Headers;
 
         // Prevent MIME-type sniffing

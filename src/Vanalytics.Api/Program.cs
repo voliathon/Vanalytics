@@ -5,6 +5,7 @@ using Microsoft.OpenApi;
 using Scalar.AspNetCore;
 using Soverance.Auth.Endpoints;
 using Soverance.Auth.Extensions;
+using Soverance.Auth.Models;
 using Soverance.Auth.Services;
 using Soverance.Forum.Extensions;
 using Soverance.Forum.Services;
@@ -55,7 +56,8 @@ builder.Services.AddOpenApi("v1", options =>
             Description = "FFXI character tracking and game data API"
         };
         document.Components ??= new OpenApiComponents();
-        document.Components!.SecuritySchemes["BearerAuth"] = new OpenApiSecurityScheme
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes["BearerAuth"] = new OpenApiSecurityScheme
         {
             Type = SecuritySchemeType.Http,
             Scheme = "bearer",
@@ -132,6 +134,16 @@ using (var scope = app.Services.CreateScope())
         await AdminSeeder.SeedAsync(db, adminEmail, adminUsername, adminPassword, logger);
     }
 
+    // Generate a dev JWT for Scalar API docs pre-authentication
+    if (app.Environment.IsDevelopment())
+    {
+        var adminUser = await db.Set<User>().FirstOrDefaultAsync(u => u.IsSystemAccount);
+        if (adminUser is not null)
+        {
+            var tokenService = scope.ServiceProvider.GetRequiredService<TokenService>();
+            app.Configuration["DevAdminToken"] = tokenService.GenerateAccessToken(adminUser);
+        }
+    }
 }
 
 // Forward proxy headers so RemoteIpAddress reflects the real client IP.
@@ -213,9 +225,17 @@ app.UseAuthorization();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    var devToken = app.Configuration["DevAdminToken"];
     app.MapScalarApiReference("/api/docs", options =>
     {
         options.Title = "Vanalytics API";
+        options.OpenApiRoutePattern = "/openapi/{documentName}.json";
+        if (!string.IsNullOrEmpty(devToken))
+        {
+            options
+                .AddHttpAuthentication("BearerAuth", scheme => scheme.WithToken(devToken))
+                .AddPreferredSecuritySchemes("BearerAuth");
+        }
     });
 }
 app.MapControllers();
