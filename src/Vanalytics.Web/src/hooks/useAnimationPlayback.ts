@@ -12,11 +12,14 @@ interface UseAnimationPlaybackOptions {
   onFrameUpdate?: (frame: number, total: number) => void
 }
 
+// Reusable temporaries to avoid GC pressure in the animation loop
 const _quatA = new THREE.Quaternion()
 const _quatB = new THREE.Quaternion()
-const _quatResult = new THREE.Quaternion()
-const _pos = new THREE.Vector3()
-const _scale = new THREE.Vector3()
+const _motionQuat = new THREE.Quaternion()
+const _motionPos = new THREE.Vector3()
+const _motionScale = new THREE.Vector3(1, 1, 1)
+const _bindLocal = new THREE.Matrix4()
+const _motionMat = new THREE.Matrix4()
 
 export function useAnimationPlayback({
   animations,
@@ -37,87 +40,88 @@ export function useAnimationPlayback({
 
     const bones = skeleton.bones
 
-    // Reset all bones to bind pose
+    // Reset all bones to bind pose first
     for (let i = 0; i < bones.length && i < bindPose.length; i++) {
       bones[i].position.copy(bindPose[i].position)
       bones[i].quaternion.copy(bindPose[i].quaternion)
       bones[i].scale.set(1, 1, 1)
+      bones[i].updateMatrix()
     }
 
     // Apply each animation section (upper body, lower body, etc.)
+    // Reference: FFXI does mat[boneNo] = mat[boneNo] * motionMatrix (row-major)
+    // In Three.js column-major, that's bone.matrix = motionMatrix * bone.matrix
     for (const anim of animations) {
-      // Static pose: apply defaults directly, no interpolation
-      if (anim.frameCount <= 1) {
-        for (const ab of anim.bones) {
-          if (ab.boneIndex < 0 || ab.boneIndex >= bones.length) continue
-          const bone = bones[ab.boneIndex]
-          _quatResult.set(ab.rotationDefault[0], ab.rotationDefault[1], ab.rotationDefault[2], ab.rotationDefault[3])
-          bone.quaternion.multiply(_quatResult)
-          bone.position.add(_pos.set(ab.translationDefault[0], ab.translationDefault[1], ab.translationDefault[2]))
-          bone.scale.multiply(_scale.set(ab.scaleDefault[0], ab.scaleDefault[1], ab.scaleDefault[2]))
-        }
-        continue
-      }
+      let motionFrame = 0
+      let motionN = 0
+      let motionJ1 = 0
 
-      const totalFrames = anim.frameCount - 1
-      const frame = (elapsedRef.current * anim.speed * 30) % totalFrames
-      const j = Math.floor(frame)
-      const n = frame - j
-      const j1 = Math.min(j + 1, totalFrames)
+      if (anim.frameCount > 1) {
+        const totalFrames = anim.frameCount - 1
+        const frame = (elapsedRef.current * anim.speed * 30) % totalFrames
+        motionFrame = Math.floor(frame)
+        motionN = frame - motionFrame
+        motionJ1 = Math.min(motionFrame + 1, totalFrames)
+      }
 
       for (const ab of anim.bones) {
         if (ab.boneIndex < 0 || ab.boneIndex >= bones.length) continue
         const bone = bones[ab.boneIndex]
 
-        // Rotation: SLERP
-        if (ab.rotationKeyframes) {
+        // Interpolate motion rotation
+        if (ab.rotationKeyframes && anim.frameCount > 1) {
           const kf = ab.rotationKeyframes
-          _quatA.set(kf[j * 4], kf[j * 4 + 1], kf[j * 4 + 2], kf[j * 4 + 3])
-          _quatB.set(kf[j1 * 4], kf[j1 * 4 + 1], kf[j1 * 4 + 2], kf[j1 * 4 + 3])
-          _quatResult.slerpQuaternions(_quatA, _quatB, n)
-          bone.quaternion.multiply(_quatResult)
+          _quatA.set(kf[motionFrame * 4], kf[motionFrame * 4 + 1], kf[motionFrame * 4 + 2], kf[motionFrame * 4 + 3])
+          _quatB.set(kf[motionJ1 * 4], kf[motionJ1 * 4 + 1], kf[motionJ1 * 4 + 2], kf[motionJ1 * 4 + 3])
+          _motionQuat.slerpQuaternions(_quatA, _quatB, motionN)
         } else {
-          _quatResult.set(
-            ab.rotationDefault[0], ab.rotationDefault[1],
-            ab.rotationDefault[2], ab.rotationDefault[3],
-          )
-          bone.quaternion.multiply(_quatResult)
+          _motionQuat.set(ab.rotationDefault[0], ab.rotationDefault[1], ab.rotationDefault[2], ab.rotationDefault[3])
         }
 
-        // Translation: LERP
-        if (ab.translationKeyframes) {
+        // Interpolate motion translation
+        if (ab.translationKeyframes && anim.frameCount > 1) {
           const kf = ab.translationKeyframes
-          _pos.set(
+          const j = motionFrame, j1 = motionJ1, n = motionN
+          _motionPos.set(
             kf[j * 3] + (kf[j1 * 3] - kf[j * 3]) * n,
             kf[j * 3 + 1] + (kf[j1 * 3 + 1] - kf[j * 3 + 1]) * n,
             kf[j * 3 + 2] + (kf[j1 * 3 + 2] - kf[j * 3 + 2]) * n,
           )
-          bone.position.add(_pos)
         } else {
-          bone.position.add(_pos.set(
-            ab.translationDefault[0], ab.translationDefault[1], ab.translationDefault[2],
-          ))
+          _motionPos.set(ab.translationDefault[0], ab.translationDefault[1], ab.translationDefault[2])
         }
 
-        // Scale: LERP
-        if (ab.scaleKeyframes) {
+        // Interpolate motion scale
+        if (ab.scaleKeyframes && anim.frameCount > 1) {
           const kf = ab.scaleKeyframes
-          _scale.set(
+          const j = motionFrame, j1 = motionJ1, n = motionN
+          _motionScale.set(
             kf[j * 3] + (kf[j1 * 3] - kf[j * 3]) * n,
             kf[j * 3 + 1] + (kf[j1 * 3 + 1] - kf[j * 3 + 1]) * n,
             kf[j * 3 + 2] + (kf[j1 * 3 + 2] - kf[j * 3 + 2]) * n,
           )
-          bone.scale.multiply(_scale)
         } else {
-          bone.scale.multiply(_scale.set(
-            ab.scaleDefault[0], ab.scaleDefault[1], ab.scaleDefault[2],
-          ))
+          _motionScale.set(ab.scaleDefault[0], ab.scaleDefault[1], ab.scaleDefault[2])
         }
+
+        // Build motion matrix and multiply with bind-pose local matrix.
+        // FFXI reference: mat[bone] *= motionMatrix (row-major post-multiply)
+        // Three.js equivalent: bone.matrix = motionMatrix * bone.matrix
+        _bindLocal.copy(bone.matrix)
+        _motionMat.compose(_motionPos, _motionQuat, _motionScale)
+        bone.matrix.multiplyMatrices(_motionMat, _bindLocal)
+
+        // Decompose back to position/quaternion/scale so Three.js hierarchy works
+        bone.matrix.decompose(bone.position, bone.quaternion, bone.scale)
       }
     }
 
-    // Let Three.js propagate the bone hierarchy and update bind matrices
-    skeleton.update()
+    // Propagate bone hierarchy and compute final world matrices
+    skeleton.bones.forEach(bone => {
+      bone.updateMatrix()
+    })
+    const rootBones = skeleton.bones.filter(b => !b.parent?.isBone)
+    rootBones.forEach(b => b.updateWorldMatrix(false, true))
 
     // Report frame for UI
     if (animations.length > 0 && onFrameUpdate) {

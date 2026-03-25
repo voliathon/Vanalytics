@@ -76,7 +76,10 @@ export default function CharacterModel({
   const [loadedMeshes, setLoadedMeshes] = useState<Map<number, THREE.Mesh[]>>(new Map())
   const [animations, setAnimations] = useState<ParsedAnimation[]>([])
   const [bindPose, setBindPose] = useState<Array<{ position: THREE.Vector3; quaternion: THREE.Quaternion }> | null>(null)
-  const [currentSkeleton, setCurrentSkeleton] = useState<THREE.Skeleton | null>(null)
+  // Shared skeleton — ALL SkinnedMeshes bind to the same skeleton instance
+  // so animation updates are visible to every mesh
+  const sharedSkeletonRef = useRef<THREE.Skeleton | null>(null)
+  const [skeletonReady, setSkeletonReady] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -107,27 +110,18 @@ export default function CharacterModel({
       }
     }
 
-    async function loadSlot(slot: SlotModel, skelMatrices: number[][] | null, threeSkeleton: THREE.Skeleton | null) {
-      // Build a cache key that includes whether skeleton was applied
+    async function loadSlot(slot: SlotModel, skelMatrices: number[][] | null) {
       const cacheKey = skelMatrices ? `skel:${slot.datPath}` : slot.datPath
       try {
         let parsed = datCache.get(cacheKey)
-        let embeddedSkeleton: ParsedSkeleton | null = null
         if (!parsed) {
           const buffer = await readFile(slot.datPath)
           const dat = parseDatFile(buffer, skelMatrices)
           parsed = { meshes: dat.meshes, textures: dat.textures }
-          embeddedSkeleton = dat.skeleton
           datCache.set(cacheKey, parsed)
         }
 
         if (cancelled) return
-
-        // Use external skeleton, or build from embedded (NPC/Monster DATs)
-        let effectiveSkeleton = threeSkeleton
-        if (!effectiveSkeleton && embeddedSkeleton) {
-          effectiveSkeleton = buildThreeSkeleton(embeddedSkeleton)
-        }
 
         const threeMeshes = parsed.meshes.map((mesh) => {
           const geometry = new THREE.BufferGeometry()
@@ -150,15 +144,14 @@ export default function CharacterModel({
             material = new THREE.MeshBasicMaterial({ color: 0x888888, side: THREE.DoubleSide })
           }
 
-          // SkinnedMesh for meshes with bone data, regular Mesh otherwise
-          if (mesh.boneIndices.length > 0 && effectiveSkeleton) {
+          // SkinnedMesh — all meshes share the SAME skeleton so animation
+          // updates are visible to every mesh simultaneously
+          if (mesh.boneIndices.length > 0 && sharedSkeletonRef.current) {
             geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(
               new Uint16Array(mesh.boneIndices), 4))
             geometry.setAttribute('skinWeight', new THREE.BufferAttribute(mesh.boneWeights, 4))
-            const clonedSkel = effectiveSkeleton.clone()
             const skinned = new THREE.SkinnedMesh(geometry, material)
-            skinned.add(clonedSkel.bones[0])
-            skinned.bind(clonedSkel)
+            skinned.bind(sharedSkeletonRef.current)
             return skinned as THREE.Mesh
           }
 
@@ -184,14 +177,26 @@ export default function CharacterModel({
       const { matrices, threeSkeleton } = await loadSkeleton()
       if (cancelled) return
       if (threeSkeleton) {
+        // Store shared skeleton and bind pose
+        sharedSkeletonRef.current = threeSkeleton
         const bp = threeSkeleton.bones.map(b => ({
           position: b.position.clone(),
           quaternion: b.quaternion.clone(),
         }))
         setBindPose(bp)
-        setCurrentSkeleton(threeSkeleton)
+        setSkeletonReady(true)
+
+        // Add root bone(s) to the group so they're in the scene graph
+        // (required for SkinnedMesh world-space computation)
+        if (groupRef.current) {
+          threeSkeleton.bones.forEach((bone, i) => {
+            if (!bone.parent || !bone.parent.isBone) {
+              groupRef.current!.add(bone)
+            }
+          })
+        }
       }
-      slots.forEach(slot => loadSlot(slot, matrices, threeSkeleton))
+      slots.forEach(slot => loadSlot(slot, matrices))
     }
 
     loadAll()
@@ -200,12 +205,12 @@ export default function CharacterModel({
 
   useEffect(() => {
     return () => {
+      // Dispose skeleton
+      sharedSkeletonRef.current?.dispose()
+      sharedSkeletonRef.current = null
       loadedMeshes.forEach(meshes => {
         meshes.forEach(mesh => {
           mesh.geometry.dispose()
-          if (mesh instanceof THREE.SkinnedMesh) {
-            mesh.skeleton?.dispose()
-          }
           if (mesh.material instanceof THREE.MeshBasicMaterial) {
             mesh.material.map?.dispose()
             mesh.material.dispose()
@@ -242,10 +247,10 @@ export default function CharacterModel({
     return () => { cancelled = true }
   }, [animationPaths, readFile])
 
-  // Wire up animation playback
+  // Wire up animation playback — uses the shared skeleton ref
   const { seekToFrame } = useAnimationPlayback({
     animations,
-    skeleton: currentSkeleton,
+    skeleton: sharedSkeletonRef.current,
     bindPose,
     playing: animationPlaying ?? false,
     speed: animationSpeed ?? 1.0,

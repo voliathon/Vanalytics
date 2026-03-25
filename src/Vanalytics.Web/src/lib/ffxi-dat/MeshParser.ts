@@ -514,15 +514,12 @@ export function parseVertexBlock(
   const materialIndex = textureName ? (textureMap.get(textureName) ?? 0) : 0
   const meshes: ParsedMesh[] = []
 
-  // Build untransformed raw vertices (bone-local space).
-  // MV2 uses dominant bone's position (x1,y1,z1 = bone L position).
-  const rawVerts: RawVert[] = [
-    ...mv1Data,
-    ...mv2Data.map(s => ({ x: s.x1, y: s.y1, z: s.z1, nx: s.nx1, ny: s.ny1, nz: s.nz1 })),
-  ]
-
   if (!skelMatrices) {
     // No skeleton — weapons, static props
+    const rawVerts: RawVert[] = [
+      ...mv1Data,
+      ...mv2Data.map(s => ({ x: s.x1, y: s.y1, z: s.z1, nx: s.nx1, ny: s.ny1, nz: s.nz1 })),
+    ]
     const { positions, normals, uvs } = expandFaces(rawVerts, faces, false)
     meshes.push({
       vertices: positions, normals, uvs,
@@ -533,9 +530,12 @@ export function parseVertexBlock(
   } else {
     const isIndirect = !!(hdr.type & 0x80)
 
-    // Original half — bone-local vertices with skinning data
+    // Original half — pre-bake vertices to bind-pose world space AND keep bone assignments.
+    // Three.js SkinnedMesh expects vertices in a shared model space (not bone-local).
+    // The shader does: newBoneWorld * inverseBind * v_bindWorld, which in bind pose = identity.
+    const origVerts = transformVertices(noB1, noB2, mv1Data, mv2Data, boneAssign, boneTbl, skelMatrices, false, isIndirect)
     const skin = buildSkinningArrays(noB1, noB2, boneAssign, boneTbl, isIndirect, false)
-    const orig = expandFaces(rawVerts, faces, false, skin.boneIndices, skin.boneWeights)
+    const orig = expandFaces(origVerts, faces, false, skin.boneIndices, skin.boneWeights)
     meshes.push({
       vertices: orig.positions, normals: orig.normals, uvs: orig.uvs,
       indices: new Uint16Array(orig.positions.length / 3),
