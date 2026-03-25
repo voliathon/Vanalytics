@@ -155,7 +155,7 @@ export interface BaseStats {
 export const STAT_KEYS: (keyof BaseStats)[] = ['hp', 'mp', 'str', 'dex', 'vit', 'agi', 'int', 'mnd', 'chr']
 
 // Master level bonuses — flat per ML (source: BGWiki Master Levels)
-const ML_BONUS_PER_LEVEL: BaseStats = {
+export const ML_BONUS_PER_LEVEL: BaseStats = {
   hp: 7, mp: 2, str: 1, dex: 1, vit: 1, agi: 1, int: 1, mnd: 1, chr: 1,
 }
 
@@ -166,7 +166,6 @@ export function calculateBaseStats(
   mainLevel: number,
   subJob: string | undefined,
   subJobLevel: number,
-  masterLevel: number = 0,
 ): BaseStats {
   const result: BaseStats = { hp: 0, mp: 0, str: 0, dex: 0, vit: 0, agi: 0, int: 0, mnd: 0, chr: 0 }
 
@@ -205,13 +204,6 @@ export function calculateBaseStats(
     let val = calcStat(raceGrades[i], mainLevel) + calcStat(jobGrades[i], mainLevel)
     if (subGrades) val += calcSubStat(subGrades[i], sLvl)
     result[key] = Math.floor(val)
-  }
-
-  // Master level bonuses
-  if (masterLevel > 0) {
-    for (const key of STAT_KEYS) {
-      result[key] += masterLevel * ML_BONUS_PER_LEVEL[key]
-    }
   }
 
   return result

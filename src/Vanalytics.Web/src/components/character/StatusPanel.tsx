@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import type { CharacterDetail, GearEntry, GameItemDetail } from '../../types/api'
-import { calculateBaseStats, STAT_KEYS, getJPGiftBonuses } from '../../lib/ffxi-stats'
+import { calculateBaseStats, STAT_KEYS, ML_BONUS_PER_LEVEL, getJPGiftBonuses } from '../../lib/ffxi-stats'
 import type { BaseStats } from '../../lib/ffxi-stats'
 
 interface StatusPanelProps {
@@ -87,7 +87,7 @@ export default function StatusPanel({ character, gear, itemCache }: StatusPanelP
     [equippedIds, itemCache],
   )
 
-  // Base stats from race + job + master level calculation
+  // Base stats from race + job calculation (no ML — ML goes in bonus to match in-game)
   const baseStats = useMemo<BaseStats | null>(() => {
     if (!hasRaceAndJob) return null
     return calculateBaseStats(
@@ -97,11 +97,10 @@ export default function StatusPanel({ character, gear, itemCache }: StatusPanelP
       activeJob!.level,
       character.subJob,
       character.subJobLevel ?? 0,
-      character.masterLevel ?? 0,
     )
-  }, [character.race, character.gender, activeJob, character.subJob, character.subJobLevel, character.masterLevel, hasRaceAndJob])
+  }, [character.race, character.gender, activeJob, character.subJob, character.subJobLevel, hasRaceAndJob])
 
-  // Bonus stats from equipment + merits
+  // Bonus stats from equipment + merits + master levels
   const bonusStats = useMemo<BaseStats | null>(() => {
     if (!allItemsLoaded) return null
     const bonus: BaseStats = { hp: 0, mp: 0, str: 0, dex: 0, vit: 0, agi: 0, int: 0, mnd: 0, chr: 0 }
@@ -126,8 +125,16 @@ export default function StatusPanel({ character, gear, itemCache }: StatusPanelP
       }
     }
 
+    // Add master level bonuses
+    const ml = character.masterLevel ?? 0
+    if (ml > 0) {
+      for (const key of STAT_KEYS) {
+        bonus[key] += ml * ML_BONUS_PER_LEVEL[key]
+      }
+    }
+
     return bonus
-  }, [equippedIds, itemCache, allItemsLoaded, character.merits])
+  }, [equippedIds, itemCache, allItemsLoaded, character.merits, character.masterLevel])
 
   // Combat stats from equipment only
   const combatStats = useMemo<Record<CombatStatKey, number> | null>(() => {
