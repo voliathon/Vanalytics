@@ -28,6 +28,8 @@ interface AnimationControlsProps {
   motionCount: number
   motionIndex: number
   onMotionIndexChange: (index: number) => void
+  favoriteAnimation?: { category: string; animationName: string; motionIndex: number }
+  onSaveFavorite?: (fav: { category: string; animationName: string; motionIndex: number } | null) => void
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 1.0, 1.5, 2.0]
@@ -38,28 +40,43 @@ export default function AnimationControls({
   onAnimationSelect, onPlayPause, onSpeedChange, onSeek,
   onStepBack, onStepForward,
   motionCount, motionIndex, onMotionIndexChange,
+  favoriteAnimation, onSaveFavorite,
 }: AnimationControlsProps) {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedAnimIndex, setSelectedAnimIndex] = useState(0)
   const initialSelectedRef = useRef(false)
 
-  // Auto-select "Emote" category (bow animation, consistent across races) or first category
+  // Auto-select favorite animation, or default to Emote category
   useEffect(() => {
     if (groups.length > 0 && !selectedCategory) {
+      if (favoriteAnimation) {
+        const favGroup = groups.find(g => g.category === favoriteAnimation.category)
+        if (favGroup) {
+          setSelectedCategory(favoriteAnimation.category)
+          return
+        }
+      }
       const emote = groups.find(g => g.category === 'Emote')
       setSelectedCategory(emote ? emote.category : groups[0].category)
     }
-  }, [groups, selectedCategory])
+  }, [groups, selectedCategory])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-select animation when category changes
   useEffect(() => {
     const group = groups.find(g => g.category === selectedCategory)
     if (group && group.animations.length > 0) {
-      // On initial Emote selection, find the "Emote" animation entry
       let idx = 0
-      if (!initialSelectedRef.current && selectedCategory === 'Emote') {
-        const emoteIdx = group.animations.findIndex(a => a.name === 'Emote')
-        if (emoteIdx >= 0) idx = emoteIdx
+      if (!initialSelectedRef.current) {
+        if (favoriteAnimation && selectedCategory === favoriteAnimation.category) {
+          const favIdx = group.animations.findIndex(a => a.name === favoriteAnimation.animationName)
+          if (favIdx >= 0) {
+            idx = favIdx
+            onMotionIndexChange(favoriteAnimation.motionIndex)
+          }
+        } else if (selectedCategory === 'Emote') {
+          const emoteIdx = group.animations.findIndex(a => a.name === 'Emote')
+          if (emoteIdx >= 0) idx = emoteIdx
+        }
         initialSelectedRef.current = true
       }
       setSelectedAnimIndex(idx)
@@ -74,6 +91,20 @@ export default function AnimationControls({
     setSelectedAnimIndex(idx)
     if (animations[idx]) {
       onAnimationSelect(animations[idx].paths)
+    }
+  }
+
+  const currentAnimName = animations[selectedAnimIndex]?.name ?? ''
+  const isFavorite = favoriteAnimation != null
+    && favoriteAnimation.category === selectedCategory
+    && favoriteAnimation.animationName === currentAnimName
+    && favoriteAnimation.motionIndex === motionIndex
+
+  const handleToggleFavorite = () => {
+    if (isFavorite) {
+      onSaveFavorite?.(null)  // clear favorite
+    } else {
+      onSaveFavorite?.({ category: selectedCategory, animationName: currentAnimName, motionIndex })
     }
   }
 
@@ -113,6 +144,19 @@ export default function AnimationControls({
               <option key={i} value={i}>Motion {i + 1}</option>
             ))}
           </select>
+        )}
+        {onSaveFavorite && (
+          <button
+            onClick={handleToggleFavorite}
+            className={`px-2 py-1 text-sm rounded transition-colors ${
+              isFavorite
+                ? 'text-amber-400 hover:text-amber-300'
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+            title={isFavorite ? 'Remove favorite animation' : 'Set as favorite animation'}
+          >
+            {isFavorite ? '★' : '☆'}
+          </button>
         )}
       </div>
 

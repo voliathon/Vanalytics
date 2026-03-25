@@ -21,6 +21,7 @@ public class CharacterDetailResponse
     public string? Linkshell { get; set; }
     public int? Nation { get; set; }
     public Dictionary<string, int>? Merits { get; set; }
+    public FavoriteAnimationDto? FavoriteAnimation { get; set; }
 
     public List<JobEntry> Jobs { get; set; } = [];
     public List<GearEntry> Gear { get; set; } = [];
@@ -49,4 +50,11 @@ public class CraftingEntry
     public string Craft { get; set; } = string.Empty;
     public int Level { get; set; }
     public string Rank { get; set; } = string.Empty;
+}
+
+public class FavoriteAnimationDto
+{
+    public string Category { get; set; } = string.Empty;
+    public string AnimationName { get; set; } = string.Empty;
+    public int MotionIndex { get; set; }
 }

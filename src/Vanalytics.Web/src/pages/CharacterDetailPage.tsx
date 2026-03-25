@@ -52,6 +52,20 @@ export default function CharacterDetailPage() {
   const raceId = toRaceId(character?.race, character?.gender)
   const { slotDatPaths } = useSlotDatPaths(localGear, raceId, character?.faceModelId)
 
+  const handleSaveFavorite = async (fav: { category: string; animationName: string; motionIndex: number } | null) => {
+    if (!character) return
+    try {
+      await api(`/api/characters/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: character.isPublic, favoriteAnimation: fav }),
+      })
+      setCharacter(prev => prev ? { ...prev, favoriteAnimation: fav ?? undefined } : prev)
+    } catch (err) {
+      console.warn('Failed to save favorite animation:', err)
+    }
+  }
+
   const handleSwapSelect = (item: GameItemSummary) => {
     if (!swapSlot) return
     setLocalGear(prev => prev.map(g =>
@@ -150,6 +164,8 @@ export default function CharacterDetailPage() {
             gear={localGear}
             slotDatPaths={slotDatPaths}
             onRequestFullscreen={() => setFullscreen(true)}
+            favoriteAnimation={character.favoriteAnimation}
+            onSaveFavorite={handleSaveFavorite}
           />
           <div className="w-[400px] flex-shrink-0">
             <EquipmentGrid

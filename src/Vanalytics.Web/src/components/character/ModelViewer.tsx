@@ -16,9 +16,11 @@ interface ModelViewerProps {
   gear: GearEntry[]
   slotDatPaths: Map<string, string>
   onRequestFullscreen?: () => void
+  favoriteAnimation?: { category: string; animationName: string; motionIndex: number }
+  onSaveFavorite?: (fav: { category: string; animationName: string; motionIndex: number } | null) => void
 }
 
-export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, onRequestFullscreen }: ModelViewerProps) {
+export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, onRequestFullscreen, favoriteAnimation, onSaveFavorite }: ModelViewerProps) {
   const { isSupported, isConfigured, isAuthorized, loading, authorize } = useFfxiFileSystem()
   const [loadingSlots, setLoadingSlots] = useState(new Set<number>())
 
@@ -106,6 +108,8 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
         motionCount={motionCount}
         motionIndex={motionIndex}
         onMotionIndexChange={setMotionIndex}
+        favoriteAnimation={favoriteAnimation}
+        onSaveFavorite={onSaveFavorite}
       />
     </div>
   )

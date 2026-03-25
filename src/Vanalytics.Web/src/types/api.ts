@@ -61,6 +61,7 @@ export interface CharacterDetail {
   jobs: JobEntry[]
   gear: GearEntry[]
   craftingSkills: CraftingEntry[]
+  favoriteAnimation?: { category: string; animationName: string; motionIndex: number }
 }
 
 export interface JobEntry {

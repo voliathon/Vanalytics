@@ -66,6 +66,9 @@ public class CharactersController : ControllerBase
         if (character.UserId != userId) return Forbid();
 
         character.IsPublic = request.IsPublic;
+        character.FavoriteAnimationJson = request.FavoriteAnimation != null
+            ? JsonSerializer.Serialize(request.FavoriteAnimation, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
+            : null;
         character.UpdatedAt = DateTimeOffset.UtcNow;
         await _db.SaveChangesAsync();
 
@@ -119,6 +122,9 @@ public class CharactersController : ControllerBase
         Nation = c.Nation,
         Merits = c.MeritsJson != null
             ? JsonSerializer.Deserialize<Dictionary<string, int>>(c.MeritsJson)
+            : null,
+        FavoriteAnimation = c.FavoriteAnimationJson != null
+            ? JsonSerializer.Deserialize<FavoriteAnimationDto>(c.FavoriteAnimationJson, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase })
             : null,
         Jobs = c.Jobs.Select(j => new JobEntry
         {

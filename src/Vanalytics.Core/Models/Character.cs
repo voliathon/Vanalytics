@@ -24,6 +24,7 @@ public class Character
     public string? Linkshell { get; set; }
     public int? Nation { get; set; }
     public string? MeritsJson { get; set; }
+    public string? FavoriteAnimationJson { get; set; }
     public DateTimeOffset? LastSyncAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
