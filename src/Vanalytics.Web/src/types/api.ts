@@ -46,6 +46,7 @@ export interface CharacterDetail {
   lastSyncAt: string | null
   race?: string
   gender?: string
+  faceModelId?: number
   subJob?: string
   subJobLevel?: number
   masterLevel?: number

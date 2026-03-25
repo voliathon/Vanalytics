@@ -90,6 +90,7 @@ public class SyncController : ControllerBase
         }
 
         // Update character metadata
+        character.FaceModelId = request.FaceModelId;
         character.SubJob = request.SubJob;
         character.SubJobLevel = request.SubJobLevel;
         character.MasterLevel = request.MasterLevel;

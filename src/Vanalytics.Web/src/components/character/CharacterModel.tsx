@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useFfxiFileSystem } from '../../context/FfxiFileSystemContext'
-import { parseDatFile } from '../../lib/ffxi-dat'
-import type { ParsedMesh, ParsedTexture } from '../../lib/ffxi-dat'
+import { parseDatFile, parseSkeletonDat, parseAnimationDat } from '../../lib/ffxi-dat'
+import { SKELETON_PATHS } from '../../lib/ffxi-dat/SkeletonParser'
+import type { ParsedMesh, ParsedTexture, ParsedSkeleton, ParsedAnimation } from '../../lib/ffxi-dat'
+import { toRaceId } from '../../lib/model-mappings'
+import { useAnimationPlayback } from '../../hooks/useAnimationPlayback'
 
 interface SlotModel {
   slotId: number
@@ -13,35 +16,118 @@ interface CharacterModelProps {
   race?: string
   gender?: string
   slots: SlotModel[]
+  animationPaths?: string[]
+  animationPlaying?: boolean
+  animationSpeed?: number
+  onAnimationFrame?: (frame: number, total: number) => void
+  onSeekRef?: (seekFn: (frame: number) => void) => void
   onSlotLoaded?: (slotId: number) => void
   onError?: (slotId: number, error: string) => void
 }
 
 const datCache = new Map<string, { meshes: ParsedMesh[]; textures: ParsedTexture[] }>()
+const skeletonCache = new Map<string, { matrices: number[][] | null; parsed: ParsedSkeleton | null }>()
+const animCache = new Map<string, ParsedAnimation[]>()
+
+function buildThreeSkeleton(skeleton: ParsedSkeleton): THREE.Skeleton {
+  const bones: THREE.Bone[] = skeleton.bones.map(() => new THREE.Bone())
+
+  // Set up parent hierarchy
+  skeleton.bones.forEach((b, i) => {
+    if (b.parentIndex >= 0 && b.parentIndex < bones.length) {
+      bones[b.parentIndex].add(bones[i])
+    }
+  })
+
+  // Set local transforms from bind pose
+  skeleton.bones.forEach((b, i) => {
+    const bone = bones[i]
+    bone.position.set(b.position[0], b.position[1], b.position[2])
+    bone.quaternion.set(b.rotation[0], b.rotation[1], b.rotation[2], b.rotation[3])
+    bone.updateMatrix()
+  })
+
+  // Compute world matrices for bind-pose inverse
+  const rootBones = bones.filter((_, i) => skeleton.bones[i].parentIndex < 0)
+  rootBones.forEach(b => b.updateWorldMatrix(false, true))
+
+  // Build inverse bind matrices
+  const bindMatrices = bones.map(bone =>
+    new THREE.Matrix4().copy(bone.matrixWorld).invert()
+  )
+
+  return new THREE.Skeleton(bones, bindMatrices)
+}
 
 export default function CharacterModel({
+  race,
+  gender,
   slots,
+  animationPaths,
+  animationPlaying,
+  animationSpeed,
+  onAnimationFrame,
+  onSeekRef,
   onSlotLoaded,
   onError,
 }: CharacterModelProps) {
   const { readFile } = useFfxiFileSystem()
   const groupRef = useRef<THREE.Group>(null)
   const [loadedMeshes, setLoadedMeshes] = useState<Map<number, THREE.Mesh[]>>(new Map())
+  const [animations, setAnimations] = useState<ParsedAnimation[]>([])
+  const [bindPose, setBindPose] = useState<Array<{ position: THREE.Vector3; quaternion: THREE.Quaternion }> | null>(null)
+  const [currentSkeleton, setCurrentSkeleton] = useState<THREE.Skeleton | null>(null)
 
   useEffect(() => {
     let cancelled = false
 
-    async function loadSlot(slot: SlotModel) {
+    async function loadSkeleton(): Promise<{ matrices: number[][] | null; threeSkeleton: THREE.Skeleton | null }> {
+      const raceId = toRaceId(race, gender)
+      if (!raceId) return { matrices: null, threeSkeleton: null }
+
+      const skelPath = SKELETON_PATHS[raceId]
+      if (!skelPath) return { matrices: null, threeSkeleton: null }
+
+      const cached = skeletonCache.get(skelPath)
+      if (cached !== undefined) {
+        const threeSkel = cached.parsed ? buildThreeSkeleton(cached.parsed) : null
+        return { matrices: cached.matrices, threeSkeleton: threeSkel }
+      }
+
       try {
-        let parsed = datCache.get(slot.datPath)
+        const buffer = await readFile(skelPath)
+        const skeleton = parseSkeletonDat(buffer)
+        const matrices = skeleton?.matrices ?? null
+        skeletonCache.set(skelPath, { matrices, parsed: skeleton ?? null })
+        const threeSkel = skeleton ? buildThreeSkeleton(skeleton) : null
+        return { matrices, threeSkeleton: threeSkel }
+      } catch {
+        skeletonCache.set(skelPath, { matrices: null, parsed: null })
+        return { matrices: null, threeSkeleton: null }
+      }
+    }
+
+    async function loadSlot(slot: SlotModel, skelMatrices: number[][] | null, threeSkeleton: THREE.Skeleton | null) {
+      // Build a cache key that includes whether skeleton was applied
+      const cacheKey = skelMatrices ? `skel:${slot.datPath}` : slot.datPath
+      try {
+        let parsed = datCache.get(cacheKey)
+        let embeddedSkeleton: ParsedSkeleton | null = null
         if (!parsed) {
           const buffer = await readFile(slot.datPath)
-          const dat = parseDatFile(buffer)
+          const dat = parseDatFile(buffer, skelMatrices)
           parsed = { meshes: dat.meshes, textures: dat.textures }
-          datCache.set(slot.datPath, parsed)
+          embeddedSkeleton = dat.skeleton
+          datCache.set(cacheKey, parsed)
         }
 
         if (cancelled) return
+
+        // Use external skeleton, or build from embedded (NPC/Monster DATs)
+        let effectiveSkeleton = threeSkeleton
+        if (!effectiveSkeleton && embeddedSkeleton) {
+          effectiveSkeleton = buildThreeSkeleton(embeddedSkeleton)
+        }
 
         const threeMeshes = parsed.meshes.map((mesh) => {
           const geometry = new THREE.BufferGeometry()
@@ -59,9 +145,21 @@ export default function CharacterModel({
             texture.magFilter = THREE.LinearFilter
             texture.minFilter = THREE.LinearMipmapLinearFilter
             texture.generateMipmaps = true
-            material = new THREE.MeshBasicMaterial({ map: texture })
+            material = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide })
           } else {
-            material = new THREE.MeshBasicMaterial({ color: 0x888888 })
+            material = new THREE.MeshBasicMaterial({ color: 0x888888, side: THREE.DoubleSide })
+          }
+
+          // SkinnedMesh for meshes with bone data, regular Mesh otherwise
+          if (mesh.boneIndices.length > 0 && effectiveSkeleton) {
+            geometry.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(
+              new Uint16Array(mesh.boneIndices), 4))
+            geometry.setAttribute('skinWeight', new THREE.BufferAttribute(mesh.boneWeights, 4))
+            const clonedSkel = effectiveSkeleton.clone()
+            const skinned = new THREE.SkinnedMesh(geometry, material)
+            skinned.add(clonedSkel.bones[0])
+            skinned.bind(clonedSkel)
+            return skinned as THREE.Mesh
           }
 
           return new THREE.Mesh(geometry, material)
@@ -82,15 +180,32 @@ export default function CharacterModel({
       }
     }
 
-    slots.forEach(loadSlot)
+    async function loadAll() {
+      const { matrices, threeSkeleton } = await loadSkeleton()
+      if (cancelled) return
+      if (threeSkeleton) {
+        const bp = threeSkeleton.bones.map(b => ({
+          position: b.position.clone(),
+          quaternion: b.quaternion.clone(),
+        }))
+        setBindPose(bp)
+        setCurrentSkeleton(threeSkeleton)
+      }
+      slots.forEach(slot => loadSlot(slot, matrices, threeSkeleton))
+    }
+
+    loadAll()
     return () => { cancelled = true }
-  }, [slots, readFile, onSlotLoaded, onError])
+  }, [race, gender, slots, readFile, onSlotLoaded, onError])
 
   useEffect(() => {
     return () => {
       loadedMeshes.forEach(meshes => {
         meshes.forEach(mesh => {
           mesh.geometry.dispose()
+          if (mesh instanceof THREE.SkinnedMesh) {
+            mesh.skeleton?.dispose()
+          }
           if (mesh.material instanceof THREE.MeshBasicMaterial) {
             mesh.material.map?.dispose()
             mesh.material.dispose()
@@ -100,8 +215,48 @@ export default function CharacterModel({
     }
   }, [loadedMeshes])
 
+  // Load animation DATs when animationPaths changes
+  useEffect(() => {
+    if (!animationPaths || animationPaths.length === 0) {
+      setAnimations([])
+      return
+    }
+    let cancelled = false
+    async function loadAnims() {
+      const allAnims: ParsedAnimation[] = []
+      for (const path of animationPaths!) {
+        const cacheKey = `anim:${path}`
+        let cached = animCache.get(cacheKey)
+        if (!cached) {
+          try {
+            const buffer = await readFile(path)
+            cached = parseAnimationDat(buffer)
+            animCache.set(cacheKey, cached)
+          } catch { continue }
+        }
+        allAnims.push(...cached)
+      }
+      if (!cancelled) setAnimations(allAnims)
+    }
+    loadAnims()
+    return () => { cancelled = true }
+  }, [animationPaths, readFile])
+
+  // Wire up animation playback
+  const { seekToFrame } = useAnimationPlayback({
+    animations,
+    skeleton: currentSkeleton,
+    bindPose,
+    playing: animationPlaying ?? false,
+    speed: animationSpeed ?? 1.0,
+    onFrameUpdate: onAnimationFrame,
+  })
+
+  // Expose seekToFrame to parent via callback ref
+  useEffect(() => { onSeekRef?.(seekToFrame) }, [seekToFrame, onSeekRef])
+
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} rotation={[Math.PI, Math.PI / 2, 0]}>
       {Array.from(loadedMeshes.values()).flat().map((mesh, i) => (
         <primitive key={i} object={mesh} />
       ))}

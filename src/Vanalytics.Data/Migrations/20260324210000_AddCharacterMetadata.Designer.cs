@@ -563,6 +563,9 @@ namespace Vanalytics.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<int?>("FaceModelId")
+                        .HasColumnType("int");
+
                     b.Property<int?>("Gender")
                         .HasColumnType("int");
 
@@ -1327,11 +1330,6 @@ namespace Vanalytics.Data.Migrations
                         .HasForeignKey("CharacterId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("Vanalytics.Core.Models.GameItem", null)
-                        .WithMany()
-                        .HasForeignKey("ItemId")
-                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("Character");
                 });

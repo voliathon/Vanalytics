@@ -16,6 +16,7 @@ public class SyncRequest
     public int ActiveJobLevel { get; set; }
 
     public int? Race { get; set; }
+    public int? FaceModelId { get; set; }
     public string? SubJob { get; set; }
     public int? SubJobLevel { get; set; }
     public int? MasterLevel { get; set; }

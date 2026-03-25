@@ -7,6 +7,7 @@ import type { ParsedDatFile, ParsedMesh, ParsedTexture, ParsedSkeleton } from '.
 const BLOCK_IMG = 0x20
 const BLOCK_BONE = 0x29
 const BLOCK_VERTEX = 0x2A
+export const BLOCK_ANIM = 0x2B
 
 const DATHEAD_SIZE = 8
 const BLOCK_PADDING = 8

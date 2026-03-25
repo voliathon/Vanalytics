@@ -11,6 +11,12 @@ namespace Vanalytics.Data.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             // Character table: new metadata columns
+            migrationBuilder.AddColumn<int>(
+                name: "FaceModelId",
+                table: "Characters",
+                type: "int",
+                nullable: true);
+
             migrationBuilder.AddColumn<string>(
                 name: "SubJob",
                 table: "Characters",
@@ -55,6 +61,11 @@ namespace Vanalytics.Data.Migrations
                 type: "nvarchar(max)",
                 nullable: true);
 
+            // Drop FK constraint on EquippedGear.ItemId — gear syncs before items exist
+            migrationBuilder.DropForeignKey(
+                name: "FK_EquippedGear_GameItems_ItemId",
+                table: "EquippedGear");
+
             // CharacterJobs table: JP/CP columns
             migrationBuilder.AddColumn<int>(
                 name: "JP",
@@ -81,6 +92,7 @@ namespace Vanalytics.Data.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(name: "FaceModelId", table: "Characters");
             migrationBuilder.DropColumn(name: "SubJob", table: "Characters");
             migrationBuilder.DropColumn(name: "SubJobLevel", table: "Characters");
             migrationBuilder.DropColumn(name: "MasterLevel", table: "Characters");

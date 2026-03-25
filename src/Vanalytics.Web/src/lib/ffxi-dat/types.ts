@@ -52,3 +52,19 @@ export interface ParsedZone {
   instances: ZoneMeshInstance[]    // MZB placement transforms
   textures: ParsedTexture[]       // reused from entity pipeline
 }
+
+export interface AnimationBone {
+  boneIndex: number
+  rotationKeyframes: Float32Array | null   // 4 floats per frame (qx,qy,qz,qw), null = use default
+  rotationDefault: [number, number, number, number]
+  translationKeyframes: Float32Array | null // 3 floats per frame (tx,ty,tz), null = use default
+  translationDefault: [number, number, number]
+  scaleKeyframes: Float32Array | null       // 3 floats per frame (sx,sy,sz), null = use default
+  scaleDefault: [number, number, number]
+}
+
+export interface ParsedAnimation {
+  frameCount: number
+  speed: number
+  bones: AnimationBone[]
+}

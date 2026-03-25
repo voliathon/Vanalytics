@@ -106,6 +106,7 @@ public class CharactersController : ControllerBase
         LastSyncAt = c.LastSyncAt,
         Race = c.Race?.ToString(),
         Gender = c.Gender?.ToString(),
+        FaceModelId = c.FaceModelId,
         SubJob = c.SubJob,
         SubJobLevel = c.SubJobLevel,
         MasterLevel = c.MasterLevel,

@@ -335,11 +335,21 @@ function expandFaces(
   rawVerts: RawVert[],
   faces: FaceUV[],
   reverseWinding: boolean,
-): { positions: Float32Array; normals: Float32Array; uvs: Float32Array } {
+  perVertexBoneIndices?: Uint8Array,
+  perVertexBoneWeights?: Float32Array,
+): {
+  positions: Float32Array
+  normals: Float32Array
+  uvs: Float32Array
+  boneIndices: Uint8Array
+  boneWeights: Float32Array
+} {
   const n = faces.length * 3
   const positions = new Float32Array(n * 3)
   const normals = new Float32Array(n * 3)
   const uvs = new Float32Array(n * 2)
+  const boneIndices = new Uint8Array(n * 4)
+  const boneWeights = new Float32Array(n * 4)
 
   for (let f = 0; f < faces.length; f++) {
     const face = faces[f]
@@ -353,7 +363,8 @@ function expandFaces(
       : [[face.u1, face.v1], [face.u2, face.v2], [face.u3, face.v3]]
 
     for (let v = 0; v < 3; v++) {
-      const vert = rawVerts[fi[v]]
+      const srcIdx = fi[v]
+      const vert = rawVerts[srcIdx]
       if (!vert) continue
       const idx = base + v
       positions[idx * 3] = vert.x
@@ -364,10 +375,64 @@ function expandFaces(
       normals[idx * 3 + 2] = vert.nz
       uvs[idx * 2] = fu[v][0]
       uvs[idx * 2 + 1] = fu[v][1]
+
+      if (perVertexBoneIndices && perVertexBoneWeights) {
+        boneIndices[idx * 4] = perVertexBoneIndices[srcIdx * 4]
+        boneIndices[idx * 4 + 1] = perVertexBoneIndices[srcIdx * 4 + 1]
+        boneIndices[idx * 4 + 2] = perVertexBoneIndices[srcIdx * 4 + 2]
+        boneIndices[idx * 4 + 3] = perVertexBoneIndices[srcIdx * 4 + 3]
+        boneWeights[idx * 4] = perVertexBoneWeights[srcIdx * 4]
+        boneWeights[idx * 4 + 1] = perVertexBoneWeights[srcIdx * 4 + 1]
+        boneWeights[idx * 4 + 2] = perVertexBoneWeights[srcIdx * 4 + 2]
+        boneWeights[idx * 4 + 3] = perVertexBoneWeights[srcIdx * 4 + 3]
+      }
     }
   }
 
-  return { positions, normals, uvs }
+  return { positions, normals, uvs, boneIndices, boneWeights }
+}
+
+/**
+ * Build per-vertex bone index and weight arrays for GPU skinning.
+ * Vertices stay in bone-local space — no matrix multiplication.
+ * MV2 dual-bone vertices use dominant bone only (V1 limitation).
+ */
+function buildSkinningArrays(
+  noB1: number, noB2: number,
+  boneAssign: BoneAssign[],
+  boneTbl: number[],
+  isIndirect: boolean,
+  flip: boolean,
+): { boneIndices: Uint8Array; boneWeights: Float32Array } {
+  const totalVerts = noB1 + noB2
+  const boneIndices = new Uint8Array(totalVerts * 4)
+  const boneWeights = new Float32Array(totalVerts * 4)
+
+  // MV1 vertices: single bone, weight = 1.0
+  for (let i = 0; i < noB1; i++) {
+    if (i < boneAssign.length) {
+      const b3 = boneAssign[i]
+      const tblIdx = flip ? b3.rightL : b3.leftL
+      const boneIdx = resolveBoneIdx(tblIdx, boneTbl, isIndirect)
+      boneIndices[i * 4] = boneIdx
+      boneWeights[i * 4] = 1.0
+    }
+  }
+
+  // MV2 vertices: dual bone — assign to DOMINANT bone (higher weight).
+  // FFXI stores different positions per bone (x1,y1,z1 / x2,y2,z2) which
+  // is incompatible with standard GPU skinning. V1 uses dominant bone only.
+  for (let i = 0; i < noB2; i++) {
+    const bIdx = noB1 + i
+    if (bIdx < boneAssign.length) {
+      const b3 = boneAssign[bIdx]
+      const tblIdxL = flip ? b3.rightL : b3.leftL
+      boneIndices[bIdx * 4] = resolveBoneIdx(tblIdxL, boneTbl, isIndirect)
+      boneWeights[bIdx * 4] = 1.0 // dominant bone gets full weight
+    }
+  }
+
+  return { boneIndices, boneWeights }
 }
 
 export function parseVertexBlock(
@@ -449,12 +514,15 @@ export function parseVertexBlock(
   const materialIndex = textureName ? (textureMap.get(textureName) ?? 0) : 0
   const meshes: ParsedMesh[] = []
 
+  // Build untransformed raw vertices (bone-local space).
+  // MV2 uses dominant bone's position (x1,y1,z1 = bone L position).
+  const rawVerts: RawVert[] = [
+    ...mv1Data,
+    ...mv2Data.map(s => ({ x: s.x1, y: s.y1, z: s.z1, nx: s.nx1, ny: s.ny1, nz: s.nz1 })),
+  ]
+
   if (!skelMatrices) {
-    // No skeleton — return untransformed (works for weapons)
-    const rawVerts = [
-      ...mv1Data,
-      ...mv2Data.map(s => ({ x: s.x1, y: s.y1, z: s.z1, nx: s.nx1, ny: s.ny1, nz: s.nz1 })),
-    ]
+    // No skeleton — weapons, static props
     const { positions, normals, uvs } = expandFaces(rawVerts, faces, false)
     meshes.push({
       vertices: positions, normals, uvs,
@@ -463,20 +531,19 @@ export function parseVertexBlock(
       materialIndex,
     })
   } else {
-    // Determine if bone indices are indirect (via boneTbl) or direct
     const isIndirect = !!(hdr.type & 0x80)
 
-    // Original half (leftL/leftH bone indices)
-    const origVerts = transformVertices(noB1, noB2, mv1Data, mv2Data, boneAssign, boneTbl, skelMatrices, false, isIndirect)
-    const orig = expandFaces(origVerts, faces, false)
+    // Original half — bone-local vertices with skinning data
+    const skin = buildSkinningArrays(noB1, noB2, boneAssign, boneTbl, isIndirect, false)
+    const orig = expandFaces(rawVerts, faces, false, skin.boneIndices, skin.boneWeights)
     meshes.push({
       vertices: orig.positions, normals: orig.normals, uvs: orig.uvs,
       indices: new Uint16Array(orig.positions.length / 3),
-      boneIndices: new Uint8Array(0), boneWeights: new Float32Array(0),
+      boneIndices: orig.boneIndices, boneWeights: orig.boneWeights,
       materialIndex,
     })
 
-    // Mirrored half (rightL/rightH bone indices + mirror flags) — only if flip != 0
+    // Mirrored half — pre-baked to world space (V1: no animation for mirrors)
     if (hdr.flip !== 0) {
       const mirrorVerts = transformVertices(noB1, noB2, mv1Data, mv2Data, boneAssign, boneTbl, skelMatrices, true, isIndirect)
       const mirror = expandFaces(mirrorVerts, faces, true)

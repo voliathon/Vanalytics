@@ -12,6 +12,7 @@ public class Character
     public bool IsPublic { get; set; }
     public Race? Race { get; set; }
     public Gender? Gender { get; set; }
+    public int? FaceModelId { get; set; }
     public string? SubJob { get; set; }
     public int? SubJobLevel { get; set; }
     public int? MasterLevel { get; set; }

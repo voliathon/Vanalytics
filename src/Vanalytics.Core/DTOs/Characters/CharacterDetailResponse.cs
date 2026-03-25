@@ -9,6 +9,7 @@ public class CharacterDetailResponse
     public DateTimeOffset? LastSyncAt { get; set; }
     public string? Race { get; set; }
     public string? Gender { get; set; }
+    public int? FaceModelId { get; set; }
     public string? SubJob { get; set; }
     public int? SubJobLevel { get; set; }
     public int? MasterLevel { get; set; }

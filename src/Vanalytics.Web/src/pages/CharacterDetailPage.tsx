@@ -10,6 +10,9 @@ import EquipmentGrid from '../components/character/EquipmentGrid'
 import EquipmentSwapModal from '../components/character/EquipmentSwapModal'
 import FullscreenViewer from '../components/character/FullscreenViewer'
 
+const STAT_TABS = ['Jobs', 'Crafting'] as const
+type StatTab = typeof STAT_TABS[number]
+
 export default function CharacterDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [character, setCharacter] = useState<CharacterDetail | null>(null)
@@ -17,6 +20,7 @@ export default function CharacterDetailPage() {
   const [swapSlot, setSwapSlot] = useState<string | null>(null)
   const [fullscreen, setFullscreen] = useState(false)
   const [localGear, setLocalGear] = useState<GearEntry[]>([])
+  const [activeTab, setActiveTab] = useState<StatTab>('Jobs')
 
   useEffect(() => {
     api<CharacterDetail>(`/api/characters/${id}`)
@@ -30,7 +34,7 @@ export default function CharacterDetailPage() {
   }, [character?.gear])
 
   const raceId = toRaceId(character?.race, character?.gender)
-  const { slotDatPaths } = useSlotDatPaths(localGear, raceId)
+  const { slotDatPaths } = useSlotDatPaths(localGear, raceId, character?.faceModelId)
 
   const handleSwapSelect = (item: GameItemSummary) => {
     if (!swapSlot) return
@@ -48,8 +52,8 @@ export default function CharacterDetailPage() {
   const nationNames: Record<number, string> = { 0: "San d'Oria", 1: 'Bastok', 2: 'Windurst' }
 
   const activeJob = character.jobs.find(j => j.isActive)
-  const jobLine = activeJob
-    ? `${activeJob.job}${activeJob.level}${character.subJob ? '/' + character.subJob + (character.subJobLevel ?? '') : ''}`
+  const jobSubLine = activeJob
+    ? `${activeJob.job}/${character.subJob ?? '???'}`
     : null
 
   const infoParts = [
@@ -71,7 +75,7 @@ export default function CharacterDetailPage() {
           <span className="text-gray-400 text-sm">{character.server}</span>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-400 mt-1">
-          {jobLine && <span className="text-gray-200 font-medium">{jobLine}</span>}
+          {jobSubLine && <span className="text-gray-200 font-medium">{jobSubLine}</span>}
           {character.masterLevel != null && character.masterLevel > 0 && (
             <span>ML{character.masterLevel}</span>
           )}
@@ -86,8 +90,25 @@ export default function CharacterDetailPage() {
       </div>
 
       <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-3">Jobs</h2>
-        <JobsGrid jobs={character.jobs} />
+        <div className="flex gap-1 border-b border-gray-700 mb-4">
+          {STAT_TABS.map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === tab
+                  ? 'text-blue-400 border-b-2 border-blue-400 -mb-px'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <div>
+          {activeTab === 'Jobs' && <JobsGrid jobs={character.jobs} />}
+          {activeTab === 'Crafting' && <CraftingTable skills={character.craftingSkills} />}
+        </div>
       </section>
 
       <section className="mb-8">
@@ -109,11 +130,6 @@ export default function CharacterDetailPage() {
         </div>
       </section>
 
-      <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-3">Crafting</h2>
-        <CraftingTable skills={character.craftingSkills} />
-      </section>
-
       {swapSlot && (
         <EquipmentSwapModal
           slotName={swapSlot}
@@ -130,7 +146,7 @@ export default function CharacterDetailPage() {
           characterName={character.name}
           server={character.server}
           slots={Array.from(slotDatPaths.entries()).map(([slotName, datPath]) => {
-            const slotMap: Record<string, number> = { Head: 2, Body: 3, Hands: 4, Legs: 5, Feet: 6, Main: 7, Sub: 8, Range: 9 }
+            const slotMap: Record<string, number> = { Face: 1, Head: 2, Body: 3, Hands: 4, Legs: 5, Feet: 6, Main: 7, Sub: 8, Range: 9 }
             return { slotId: slotMap[slotName] ?? 0, datPath }
           }).filter(s => s.slotId > 0)}
           onExit={() => setFullscreen(false)}

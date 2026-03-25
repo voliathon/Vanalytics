@@ -6,6 +6,22 @@ const CRAFT_ORDER = [
   'Synergy',
 ]
 
+// Gold threshold: the max achievable level for each craft
+const GOLD_THRESHOLD: Record<string, number> = {
+  Fishing: 100,
+  Synergy: 80,
+}
+const DEFAULT_GOLD = 110 // standard crafts
+const BLUE_THRESHOLD = 70 // Craftsman rank (beyond base cap for most players)
+
+function getCraftStyle(craft: string, level: number): string {
+  const gold = GOLD_THRESHOLD[craft] ?? DEFAULT_GOLD
+  if (level >= gold) return 'text-amber-400 font-bold'
+  if (level >= BLUE_THRESHOLD) return 'text-blue-300 font-bold'
+  if (level > 0) return 'text-gray-300'
+  return 'text-gray-600'
+}
+
 export default function CraftingTable({ skills }: { skills: CraftingEntry[] }) {
   if (skills.length === 0) return <p className="text-gray-500 text-sm">No crafting data.</p>
 
@@ -25,13 +41,16 @@ export default function CraftingTable({ skills }: { skills: CraftingEntry[] }) {
         </tr>
       </thead>
       <tbody>
-        {ordered.map(s => (
-          <tr key={s.craft} className="border-b border-gray-800/50">
-            <td className="py-1 pr-8">{s.craft}</td>
-            <td className="py-1 pr-8 text-gray-400">{s.rank}</td>
-            <td className="py-1 text-right text-gray-300">{s.level}</td>
-          </tr>
-        ))}
+        {ordered.map(s => {
+          const style = getCraftStyle(s.craft, s.level)
+          return (
+            <tr key={s.craft} className={`border-b border-gray-800/50 ${style}`}>
+              <td className="py-1 pr-8">{s.craft}</td>
+              <td className="py-1 pr-8">{s.rank}</td>
+              <td className="py-1 text-right">{s.level}</td>
+            </tr>
+          )
+        })}
       </tbody>
     </table>
   )
