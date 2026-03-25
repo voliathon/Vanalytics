@@ -76,6 +76,9 @@ export default function StatusPanel({ character, gear, itemCache }: StatusPanelP
   const activeJob = character.jobs.find(j => j.isActive)
   const hasRaceAndJob = !!character.race && !!activeJob
 
+  // Debug: remove after verifying base stats work
+  console.log('[StatusPanel]', { race: character.race, gender: character.gender, activeJob, hasRaceAndJob })
+
   // Check whether all equipped items have been fetched
   const equippedIds = useMemo(
     () => gear.filter(g => g.itemId > 0).map(g => g.itemId),
@@ -201,8 +204,8 @@ function BaseTab({
               <td className="py-1 text-right text-gray-300">
                 {base != null ? base : '—'}
               </td>
-              <td className="py-1 text-right text-gray-300">
-                {bonus != null ? (bonus >= 0 ? `+${bonus}` : `${bonus}`) : '—'}
+              <td className={`py-1 text-right ${bonus != null && bonus > 0 ? 'text-green-400' : bonus != null && bonus < 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                {bonus != null ? (bonus > 0 ? `+${bonus}` : bonus < 0 ? `${bonus}` : '—') : '—'}
               </td>
               <td className="py-1 text-right text-gray-200 font-medium">
                 {total != null ? total : '—'}

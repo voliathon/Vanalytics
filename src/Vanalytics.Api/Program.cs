@@ -209,11 +209,14 @@ app.UseStaticFiles();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
-app.MapOpenApi();
-app.MapScalarApiReference("/api/docs", options =>
+if (app.Environment.IsDevelopment())
 {
-    options.Title = "Vanalytics API";
-});
+    app.MapOpenApi();
+    app.MapScalarApiReference("/api/docs", options =>
+    {
+        options.Title = "Vanalytics API";
+    });
+}
 app.MapControllers();
 app.MapSamlEndpoints();
 app.MapSamlAdminEndpoints();
