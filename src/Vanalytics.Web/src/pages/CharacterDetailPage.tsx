@@ -16,12 +16,14 @@ import InventoryTab from '../components/character/InventoryTab'
 import RelicsTab from '../components/character/RelicsTab'
 import MacroPageReel from '../components/macros/MacroPageReel'
 import MacroEditorPanel from '../components/macros/MacroEditorPanel'
+import SessionsTab from '../components/session/SessionsTab'
+import SessionDetailModal from '../components/session/SessionDetailModal'
 import { ApiError } from '../api/client'
 
 const STAT_TABS = ['Jobs', 'Crafting', 'Relics'] as const
 type StatTab = typeof STAT_TABS[number]
 
-const GEAR_TABS = ['Equipment', 'Inventory', 'Macros'] as const
+const GEAR_TABS = ['Equipment', 'Inventory', 'Macros', 'Sessions'] as const
 type GearTab = typeof GEAR_TABS[number]
 
 export default function CharacterDetailPage() {
@@ -42,6 +44,8 @@ export default function CharacterDetailPage() {
   const [currentMacroPage, setCurrentMacroPage] = useState(1)
   const [selectedMacro, setSelectedMacro] = useState<{ set: 'Ctrl' | 'Alt'; position: number } | null>(null)
   const [macroError, setMacroError] = useState('')
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
+  const [sessionsRefreshKey, setSessionsRefreshKey] = useState(0)
 
   useEffect(() => {
     setCharacter(null)
@@ -345,6 +349,14 @@ export default function CharacterDetailPage() {
             )}
           </div>
         )}
+
+        {gearTab === 'Sessions' && (
+          <SessionsTab
+            key={sessionsRefreshKey}
+            characterId={character.id}
+            onSelectSession={setSelectedSessionId}
+          />
+        )}
       </section>
 
       {swapSlot && (
@@ -367,6 +379,13 @@ export default function CharacterDetailPage() {
             return { slotId: slotMap[slotName] ?? 0, datPath }
           }).filter(s => s.slotId > 0)}
           onExit={() => setFullscreen(false)}
+        />
+      )}
+      {selectedSessionId && (
+        <SessionDetailModal
+          sessionId={selectedSessionId}
+          onClose={() => setSelectedSessionId(null)}
+          onDeleted={() => setSessionsRefreshKey(k => k + 1)}
         />
       )}
     </div>

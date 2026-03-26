@@ -114,38 +114,25 @@ builder.Services.AddForumServices();
 builder.Services.AddScoped<IForumAuthorResolver, VanalyticsForumAuthorResolver>();
 builder.Services.AddScoped<IForumSearchService, ForumSearchService>();
 
+// Run EF migrations + seeding in the background so the HTTP server starts
+// immediately and can respond to health/startup probes while the database
+// is still waking up (Azure SQL auto-pause) or migrations are running.
+builder.Services.AddHostedService<DatabaseMigrationService>();
+
 var app = builder.Build();
 
-// Apply migrations and seed admin on startup
-using (var scope = app.Services.CreateScope())
+// Generate a dev JWT for Scalar API docs pre-authentication
+if (app.Environment.IsDevelopment())
 {
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
+    // In dev, run migrations synchronously so the dev token can be generated
     await db.Database.MigrateAsync();
-
-    var adminEmail = app.Configuration["ADMIN_EMAIL"];
-    var adminUsername = app.Configuration["ADMIN_USERNAME"];
-    var adminPassword = app.Configuration["ADMIN_PASSWORD"];
-
-    if (!string.IsNullOrEmpty(adminEmail) &&
-        !string.IsNullOrEmpty(adminUsername) &&
-        !string.IsNullOrEmpty(adminPassword))
+    var adminUser = await db.Set<User>().FirstOrDefaultAsync(u => u.IsSystemAccount);
+    if (adminUser is not null)
     {
-        await AdminSeeder.SeedAsync(db, adminEmail, adminUsername, adminPassword, logger);
-    }
-
-    await ForumSeeder.SeedSystemCategoriesAsync(db);
-
-    // Generate a dev JWT for Scalar API docs pre-authentication
-    if (app.Environment.IsDevelopment())
-    {
-        var adminUser = await db.Set<User>().FirstOrDefaultAsync(u => u.IsSystemAccount);
-        if (adminUser is not null)
-        {
-            var tokenService = scope.ServiceProvider.GetRequiredService<TokenService>();
-            app.Configuration["DevAdminToken"] = tokenService.GenerateAccessToken(adminUser);
-        }
+        var tokenService = scope.ServiceProvider.GetRequiredService<TokenService>();
+        app.Configuration["DevAdminToken"] = tokenService.GenerateAccessToken(adminUser);
     }
 }
 
