@@ -26,6 +26,9 @@ public class VanalyticsDbContext(DbContextOptions<VanalyticsDbContext> options)
     public DbSet<SessionEvent> SessionEvents => Set<SessionEvent>();
     public DbSet<CharacterInventory> CharacterInventories => Set<CharacterInventory>();
     public DbSet<InventoryChange> InventoryChanges => Set<InventoryChange>();
+    public DbSet<MacroBook> MacroBooks => Set<MacroBook>();
+    public DbSet<MacroPage> MacroPages => Set<MacroPage>();
+    public DbSet<Macro> Macros => Set<Macro>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
