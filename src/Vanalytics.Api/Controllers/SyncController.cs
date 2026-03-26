@@ -226,6 +226,7 @@ public class SyncController : ControllerBase
 
         // Find the character owned by this user (most recently synced)
         var character = await _db.Characters
+            .OrderByDescending(c => c.LastSyncAt)
             .FirstOrDefaultAsync(c => c.UserId == userId);
         if (character is null)
             return NotFound(new { message = "No character found. Sync character data first." });
@@ -233,7 +234,6 @@ public class SyncController : ControllerBase
         foreach (var bookEntry in request.Books)
         {
             var book = await _db.MacroBooks
-                .Include(b => b.Pages).ThenInclude(p => p.Macros)
                 .FirstOrDefaultAsync(b => b.CharacterId == character.Id && b.BookNumber == bookEntry.BookNumber);
 
             if (book is null)
@@ -304,6 +304,7 @@ public class SyncController : ControllerBase
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var character = await _db.Characters
+            .OrderByDescending(c => c.LastSyncAt)
             .FirstOrDefaultAsync(c => c.UserId == userId);
         if (character is null)
             return Ok(new { pendingBooks = Array.Empty<int>() });
@@ -323,6 +324,7 @@ public class SyncController : ControllerBase
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var character = await _db.Characters
+            .OrderByDescending(c => c.LastSyncAt)
             .FirstOrDefaultAsync(c => c.UserId == userId);
         if (character is null)
             return NotFound(new { message = "No character found." });
@@ -342,6 +344,7 @@ public class SyncController : ControllerBase
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var character = await _db.Characters
+            .OrderByDescending(c => c.LastSyncAt)
             .FirstOrDefaultAsync(c => c.UserId == userId);
         if (character is null)
             return NotFound();
