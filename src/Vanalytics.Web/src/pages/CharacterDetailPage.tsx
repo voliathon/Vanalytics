@@ -11,8 +11,9 @@ import StatusPanel from '../components/character/StatusPanel'
 import EquipmentSwapModal from '../components/character/EquipmentSwapModal'
 import FullscreenViewer from '../components/character/FullscreenViewer'
 import InventoryTab from '../components/character/InventoryTab'
+import RelicsTab from '../components/character/RelicsTab'
 
-const STAT_TABS = ['Jobs', 'Crafting'] as const
+const STAT_TABS = ['Jobs', 'Crafting', 'Relics'] as const
 type StatTab = typeof STAT_TABS[number]
 
 export default function CharacterDetailPage() {
@@ -119,6 +120,9 @@ export default function CharacterDetailPage() {
           {character.lastSyncAt && (
             <span>Last sync: {new Date(character.lastSyncAt).toLocaleString()}</span>
           )}
+          <Link to={`/characters/${id}/macros`} className="text-blue-400 hover:underline text-sm">
+            Macro Editor
+          </Link>
         </div>
       </div>
 
@@ -144,6 +148,7 @@ export default function CharacterDetailPage() {
             <div className="min-h-[400px]">
               {activeTab === 'Jobs' && <JobsGrid jobs={character.jobs} />}
               {activeTab === 'Crafting' && <CraftingTable skills={character.craftingSkills} />}
+              {activeTab === 'Relics' && <RelicsTab characterId={character.id} />}
             </div>
           </div>
 
