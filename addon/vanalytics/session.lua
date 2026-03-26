@@ -20,6 +20,7 @@ local server_name = nil
 local settings = nil
 local http_request_fn = nil
 local json_encode_fn = nil
+local json_decode_fn = nil
 local log_fn = nil
 local log_error_fn = nil
 local log_success_fn = nil
@@ -31,6 +32,7 @@ function session.init(deps)
     settings = deps.settings
     http_request_fn = deps.http_request
     json_encode_fn = deps.json_encode
+    json_decode_fn = deps.json_decode
     log_fn = deps.log
     log_error_fn = deps.log_error
     log_success_fn = deps.log_success
@@ -45,6 +47,24 @@ local function get_zone_name()
         return res.zones[info.zone].en
     end
     return 'Unknown'
+end
+
+-----------------------------------------------------------------------
+-- Internal: map short JSONL keys to API SessionEventEntry field names
+-----------------------------------------------------------------------
+local function jsonl_to_api_event(raw_line)
+    local ok, event = pcall(json_decode_fn, raw_line)
+    if not ok or not event then return nil end
+    return {
+        EventType = event.t,
+        Timestamp = event.ts and os.date('!%Y-%m-%dT%H:%M:%SZ', event.ts) or nil,
+        Source = event.s or '',
+        Target = event.tg or '',
+        Value = event.v or 0,
+        Ability = event.a,
+        ItemId = event.item_id,
+        Zone = event.z or '',
+    }
 end
 
 -----------------------------------------------------------------------
@@ -134,6 +154,12 @@ local function parse_line(line)
         return {t='MobKill', s=source, tg=target, v=0}
     end
 
+    -- Gil obtain: "Player obtains N gil." (must come before item quantity pattern)
+    who, amount = line:match("(.+) obtains (%d+) gil%.")
+    if who then
+        return {t='GilGain', s=who, tg='', v=tonumber(amount)}
+    end
+
     -- Item obtain (singular): "Player obtains a Item."
     who, item = line:match("(.+) obtains a (.+)%.")
     if who then
@@ -144,12 +170,6 @@ local function parse_line(line)
     who, count, item = line:match("(.+) obtains (%d+) (.+)%.")
     if who then
         return {t='ItemDrop', s=who, tg=item, v=tonumber(count)}
-    end
-
-    -- Gil obtain: "Player obtains N gil."
-    who, amount = line:match("(.+) obtains (%d+) gil%.")
-    if who then
-        return {t='GilGain', s=who, tg='', v=tonumber(amount)}
     end
 
     -- Gil loss: "You lose N gil."
@@ -250,7 +270,7 @@ function session.start(character_name, server, zone)
     end
 
     active = true
-    start_time = os.clock()
+    start_time = os.time()
     event_count = 0
     uploaded_count = 0
 
@@ -279,7 +299,7 @@ function session.stop()
     })
 
     -- Calculate duration
-    local duration = os.clock() - start_time
+    local duration = os.time() - start_time
     local minutes = math.floor(duration / 60)
     local seconds = math.floor(duration % 60)
     local final_count = event_count
@@ -324,18 +344,31 @@ function session.flush()
         return
     end
 
+    -- Decode JSONL lines into structured API event objects
+    local api_events = {}
+    for _, raw_line in ipairs(pending_lines) do
+        local event = jsonl_to_api_event(raw_line)
+        if event then
+            table.insert(api_events, event)
+        end
+    end
+
+    if #api_events == 0 then
+        return
+    end
+
     -- Batch into groups of 500
     local batch_size = 500
     local total_uploaded = 0
 
-    for batch_start = 1, #pending_lines, batch_size do
-        local batch_end = math.min(batch_start + batch_size - 1, #pending_lines)
+    for batch_start = 1, #api_events, batch_size do
+        local batch_end = math.min(batch_start + batch_size - 1, #api_events)
         local batch = {}
         for i = batch_start, batch_end do
-            table.insert(batch, pending_lines[i])
+            table.insert(batch, api_events[i])
         end
 
-        -- POST batch to API (send raw JSONL lines as array of strings)
+        -- POST batch to API as structured event objects
         local result, status_code = api_post('/api/session/events', {
             characterName = player_name,
             server = server_name,
@@ -396,7 +429,7 @@ function session.print_status()
         return
     end
 
-    local duration = os.clock() - start_time
+    local duration = os.time() - start_time
     local minutes = math.floor(duration / 60)
     local seconds = math.floor(duration % 60)
 

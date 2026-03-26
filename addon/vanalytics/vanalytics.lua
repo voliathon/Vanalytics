@@ -313,6 +313,9 @@ local function find_macro_path()
     return user_dir .. '\\' .. best_dir
 end
 
+-- Stored file timestamps from last macro check (avoids re-hashing unchanged files)
+local macro_file_timestamps = {}
+
 local function sync_macros(force)
     if settings.ApiKey == '' then return end
 
@@ -328,26 +331,45 @@ local function sync_macros(force)
         return
     end
 
+    -- Single dir command to get all file timestamps (cheap compared to reading 200 files)
+    local new_timestamps = macro_lib.get_file_timestamps(macro_path)
+
     local changed_books = {}
     local new_hashes = {}
     local books_found = 0
-    local titles = macro_lib.parse_titles(macro_path)
+    local titles = nil  -- lazy-loaded only if needed
 
     for book_num = 1, macro_lib.BOOKS_COUNT do
         local hash_key = 'book' .. book_num
-        local hash = macro_lib.hash_book(macro_path, book_num)
-        if hash then
-            books_found = books_found + 1
-            local stored_hash = settings.macro_hashes[hash_key]
-            if force or hash ~= stored_hash then
-                local book = macro_lib.parse_book(macro_path, book_num)
-                if book then
-                    table.insert(changed_books, macro_lib.book_to_api(book, book_num, hash, titles[book_num]))
-                    new_hashes[hash_key] = hash
+
+        -- Fast path: skip books whose files haven't been modified since last check
+        if not force and not macro_lib.book_files_changed(macro_path, book_num, macro_file_timestamps, new_timestamps) then
+            -- Check if we have a stored hash (i.e., we've seen this book before)
+            if settings.macro_hashes[hash_key] then
+                books_found = books_found + 1
+            end
+        else
+            -- Files changed (or force) — compute hash to confirm actual content change
+            local hash = macro_lib.hash_book(macro_path, book_num)
+            if hash then
+                books_found = books_found + 1
+                local stored_hash = settings.macro_hashes[hash_key]
+                if force or hash ~= stored_hash then
+                    if not titles then
+                        titles = macro_lib.parse_titles(macro_path)
+                    end
+                    local book = macro_lib.parse_book(macro_path, book_num)
+                    if book then
+                        table.insert(changed_books, macro_lib.book_to_api(book, book_num, hash, titles[book_num]))
+                        new_hashes[hash_key] = hash
+                    end
                 end
             end
         end
     end
+
+    -- Update stored timestamps for next cycle
+    macro_file_timestamps = new_timestamps
 
     if books_found == 0 then
         log_error('No macro DAT files found at: ' .. macro_path)
@@ -355,7 +377,6 @@ local function sync_macros(force)
     end
 
     if #changed_books == 0 then
-        log('Macros: no changes detected (' .. books_found .. ' books checked).')
         return
     end
 
@@ -497,6 +518,7 @@ session.init({
     settings = settings,
     http_request = http_request,
     json_encode = json_encode,
+    json_decode = json_decode,
     log = log,
     log_error = log_error,
     log_success = log_success,
@@ -889,8 +911,28 @@ local function scan_bazaars()
     })
 end
 
+-----------------------------------------------------------------------
+-- Work queue: spreads sync tasks across frames to avoid stutter.
+-- Each entry is a function. One function runs per frame until the queue
+-- is empty.
+-----------------------------------------------------------------------
+local work_queue = {}
+
+local function enqueue_sync_work()
+    -- Queue each sync task as a separate frame's work
+    table.insert(work_queue, function() do_sync() end)
+    table.insert(work_queue, function() scan_bazaars() end)
+    table.insert(work_queue, function() sync_macros(false) end)
+end
+
 -- Single prerender handler registered once at load time
 windower.register_event('prerender', function()
+    -- Process one queued work item per frame
+    if #work_queue > 0 then
+        local task = table.remove(work_queue, 1)
+        task()
+    end
+
     if not timer_active then return end
 
     local now = os.clock()
@@ -899,11 +941,7 @@ windower.register_event('prerender', function()
 
     if timer_elapsed >= timer_interval_seconds then
         timer_elapsed = 0
-        do_sync()
-        -- Bazaar scan only runs if there are nearby bazaar players (early return in scan_bazaars
-        -- if none found). Macro sync only uploads changed books (hash-compared).
-        scan_bazaars()
-        sync_macros(false)
+        enqueue_sync_work()
     end
 
     -- Check if session needs auto-flush
@@ -1181,4 +1219,7 @@ end)
 
 windower.register_event('unload', function()
     stop_timer()
+    if session.is_active() then
+        session.stop()
+    end
 end)

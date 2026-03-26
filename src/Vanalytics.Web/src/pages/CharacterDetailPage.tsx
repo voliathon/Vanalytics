@@ -46,6 +46,8 @@ export default function CharacterDetailPage() {
   const [macroError, setMacroError] = useState('')
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [sessionsRefreshKey, setSessionsRefreshKey] = useState(0)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     setCharacter(null)
@@ -103,6 +105,22 @@ export default function CharacterDetailPage() {
     }
   }
 
+  const handleTogglePublic = async () => {
+    if (!character) return
+    const newPublic = !character.isPublic
+    try {
+      await api(`/api/characters/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPublic: newPublic, favoriteAnimation: character.favoriteAnimation ?? null }),
+      })
+      setCharacter(prev => prev ? { ...prev, isPublic: newPublic } : prev)
+      if (newPublic) setShowShareModal(true)
+    } catch (err) {
+      console.warn('Failed to toggle public profile:', err)
+    }
+  }
+
   const handleSwapSelect = (item: GameItemSummary) => {
     if (!swapSlot) return
     setLocalGear(prev => prev.map(g =>
@@ -150,9 +168,19 @@ export default function CharacterDetailPage() {
       </Link>
 
       <div className="mb-6">
-        <div className="flex items-baseline gap-3">
+        <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">{character.name}</h1>
-          <span className="text-gray-400 text-sm">{character.server}</span>
+          <span className="text-gray-400 text-sm self-baseline">{character.server}</span>
+          <button
+            onClick={character.isPublic ? () => setShowShareModal(true) : handleTogglePublic}
+            className={`ml-auto flex items-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors ${
+              character.isPublic
+                ? 'bg-green-900/40 text-green-400 border border-green-700 hover:bg-green-900/60'
+                : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700 hover:text-gray-200'
+            }`}
+          >
+            {character.isPublic ? 'Public Profile' : 'Make Public'}
+          </button>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-400 mt-1">
           {jobSubLine && <span className="text-gray-200 font-medium">{jobSubLine}</span>}
@@ -387,6 +415,53 @@ export default function CharacterDetailPage() {
           onClose={() => setSelectedSessionId(null)}
           onDeleted={() => setSessionsRefreshKey(k => k + 1)}
         />
+      )}
+
+      {showShareModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => { setShowShareModal(false); setCopied(false) }}>
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
+            <h2 className="text-lg font-semibold mb-2">Public Profile</h2>
+            <p className="text-sm text-gray-400 mb-4">
+              Your profile is public. Share this link so others can view your character.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={`${window.location.origin}/${character.server}/${character.name}`}
+                className="flex-1 rounded bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-200 select-all"
+                onFocus={e => e.target.select()}
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/${character.server}/${character.name}`)
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                }}
+                className="rounded bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors whitespace-nowrap"
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+              <button
+                onClick={async () => {
+                  await handleTogglePublic()
+                  setShowShareModal(false)
+                  setCopied(false)
+                }}
+                className="text-xs text-red-400 hover:text-red-300"
+              >
+                Make Private
+              </button>
+              <button
+                onClick={() => { setShowShareModal(false); setCopied(false) }}
+                className="rounded bg-gray-800 px-4 py-1.5 text-sm text-gray-300 hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

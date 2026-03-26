@@ -102,6 +102,14 @@ function LayoutInner() {
   const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { isOpen: loginOpen, close: closeLogin } = useLoginModal()
+  const [version, setVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/health')
+      .then((r) => r.json())
+      .then((d) => setVersion(d.version ?? null))
+      .catch(() => {})
+  }, [])
 
   const { pathname } = useLocation()
   const [openSection, setOpenSection] = useState<SectionName | null>(() => getSection(pathname))
@@ -176,6 +184,10 @@ function LayoutInner() {
             </SidebarSection>
           )}
         </nav>
+
+        {version && (
+          <div className="px-4 py-2 text-[11px] text-gray-600">v{version}</div>
+        )}
 
         {/* User profile */}
         <NavLink
