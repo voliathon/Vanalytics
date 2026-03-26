@@ -36,6 +36,7 @@ export interface ParsedDatFile {
   meshes: ParsedMesh[]
   textures: ParsedTexture[]
   skeleton: ParsedSkeleton | null
+  animations: ParsedAnimation[]
 }
 
 export interface ParsedZoneMesh {
