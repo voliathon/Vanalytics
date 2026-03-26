@@ -11,12 +11,14 @@ local config = require('config')
 local res = require('resources')
 local session = require('session')
 local inventory = require('inventory')
+local macro_lib = require('macros')
 
 -- Default settings (matches settings.xml)
 local defaults = {
     ApiUrl = 'https://vanalytics.soverance.com',
     ApiKey = '',
     SyncInterval = 15,
+    macro_hashes = {},
 }
 
 local settings = config.load(defaults)
@@ -171,6 +173,287 @@ local function json_encode(val)
         return 'null'
     end
     return 'null'
+end
+
+-----------------------------------------------------------------------
+-- JSON decoder (minimal, sufficient for API responses)
+-----------------------------------------------------------------------
+local json_decode
+do
+    local function skip_ws(s, pos)
+        return s:match('^%s*()', pos)
+    end
+
+    local function decode_string(s, pos)
+        -- pos should be right after opening "
+        local result = {}
+        local i = pos
+        while i <= #s do
+            local c = s:sub(i, i)
+            if c == '"' then
+                return table.concat(result), i + 1
+            elseif c == '\\' then
+                i = i + 1
+                local esc = s:sub(i, i)
+                if esc == '"' then table.insert(result, '"')
+                elseif esc == '\\' then table.insert(result, '\\')
+                elseif esc == '/' then table.insert(result, '/')
+                elseif esc == 'n' then table.insert(result, '\n')
+                elseif esc == 'r' then table.insert(result, '\r')
+                elseif esc == 't' then table.insert(result, '\t')
+                else table.insert(result, esc)
+                end
+                i = i + 1
+            else
+                table.insert(result, c)
+                i = i + 1
+            end
+        end
+        return table.concat(result), i
+    end
+
+    local function decode_value(s, pos)
+        pos = skip_ws(s, pos)
+        local c = s:sub(pos, pos)
+
+        if c == '"' then
+            return decode_string(s, pos + 1)
+        elseif c == '{' then
+            local obj = {}
+            pos = skip_ws(s, pos + 1)
+            if s:sub(pos, pos) == '}' then return obj, pos + 1 end
+            while true do
+                pos = skip_ws(s, pos)
+                if s:sub(pos, pos) ~= '"' then break end
+                local key
+                key, pos = decode_string(s, pos + 1)
+                pos = skip_ws(s, pos)
+                if s:sub(pos, pos) == ':' then pos = pos + 1 end
+                local val
+                val, pos = decode_value(s, pos)
+                obj[key] = val
+                pos = skip_ws(s, pos)
+                if s:sub(pos, pos) == ',' then pos = pos + 1
+                elseif s:sub(pos, pos) == '}' then pos = pos + 1; break
+                end
+            end
+            return obj, pos
+        elseif c == '[' then
+            local arr = {}
+            pos = skip_ws(s, pos + 1)
+            if s:sub(pos, pos) == ']' then return arr, pos + 1 end
+            while true do
+                local val
+                val, pos = decode_value(s, pos)
+                table.insert(arr, val)
+                pos = skip_ws(s, pos)
+                if s:sub(pos, pos) == ',' then pos = pos + 1
+                elseif s:sub(pos, pos) == ']' then pos = pos + 1; break
+                end
+            end
+            return arr, pos
+        elseif s:sub(pos, pos + 3) == 'true' then
+            return true, pos + 4
+        elseif s:sub(pos, pos + 4) == 'false' then
+            return false, pos + 5
+        elseif s:sub(pos, pos + 3) == 'null' then
+            return nil, pos + 4
+        else
+            -- number
+            local num_str = s:match('^-?%d+%.?%d*[eE]?[+-]?%d*', pos)
+            if num_str then
+                return tonumber(num_str), pos + #num_str
+            end
+            return nil, pos + 1
+        end
+    end
+
+    json_decode = function(s)
+        if not s or s == '' then return nil end
+        local val, _ = decode_value(s, 1)
+        return val
+    end
+end
+
+-----------------------------------------------------------------------
+-- Macro sync functions
+-----------------------------------------------------------------------
+local function find_macro_path()
+    local user_dir = windower.pol_path .. '\\USER'
+    -- Find the most recently modified content ID directory
+    local best_dir = nil
+    local best_time = 0
+    local handle = io.popen('dir "' .. user_dir .. '" /b /ad /o-d 2>nul')
+    if handle then
+        -- First line is the most recently modified directory
+        best_dir = handle:read('*l')
+        handle:close()
+    end
+    if not best_dir then return nil end
+    return user_dir .. '\\' .. best_dir
+end
+
+local function sync_macros(force)
+    if settings.ApiKey == '' then return end
+
+    local player = windower.ffxi.get_player()
+    if not player then return end
+
+    local info = windower.ffxi.get_info()
+    local server = res.servers[info.server] and res.servers[info.server].en or 'Unknown'
+
+    local macro_path = find_macro_path()
+    if not macro_path then
+        log_error('Could not find macro directory.')
+        return
+    end
+
+    local changed_books = {}
+    local new_hashes = {}
+
+    for i = 0, 19 do
+        local filename = string.format('mcr%d.dat', i)
+        local filepath = macro_path .. '\\' .. filename
+        local hash = macro_lib.hash_file(filepath)
+        if hash then
+            local stored_hash = settings.macro_hashes[filename]
+            if force or hash ~= stored_hash then
+                local book = macro_lib.parse_book(filepath)
+                if book then
+                    table.insert(changed_books, macro_lib.book_to_api(book, i, hash))
+                end
+            end
+            new_hashes[filename] = hash
+        end
+    end
+
+    if #changed_books == 0 then return end
+
+    local payload = json_encode({
+        characterName = player.name,
+        server = server,
+        books = changed_books,
+    })
+
+    local url = settings.ApiUrl .. '/api/sync/macros'
+    local ltn12 = require('ltn12')
+    local response_body = {}
+
+    local result, status_code = http_request({
+        url = url,
+        method = 'POST',
+        headers = {
+            ['Content-Type'] = 'application/json',
+            ['Content-Length'] = tostring(#payload),
+            ['X-Api-Key'] = settings.ApiKey,
+        },
+        source = ltn12.source.string(payload),
+        sink = ltn12.sink.table(response_body),
+    })
+
+    if not result then
+        log_error('Macro sync connection failed: ' .. tostring(status_code))
+        return
+    end
+
+    if status_code == 200 then
+        -- Update stored hashes on success
+        for filename, hash in pairs(new_hashes) do
+            settings.macro_hashes[filename] = hash
+        end
+        config.save(settings)
+        log_success('Macro sync: ' .. #changed_books .. ' book(s) uploaded.')
+    else
+        log_error('Macro sync failed with status ' .. tostring(status_code))
+    end
+end
+
+local function check_pending_macros(macro_path)
+    if settings.ApiKey == '' then return end
+
+    local player = windower.ffxi.get_player()
+    if not player then return end
+
+    local info = windower.ffxi.get_info()
+    local server = res.servers[info.server] and res.servers[info.server].en or 'Unknown'
+
+    if not macro_path then
+        macro_path = find_macro_path()
+    end
+    if not macro_path then
+        log_error('Could not find macro directory.')
+        return
+    end
+
+    local url = settings.ApiUrl .. '/api/sync/macros/pending'
+    local ltn12 = require('ltn12')
+    local response_body = {}
+
+    local result, status_code = http_request({
+        url = url,
+        method = 'GET',
+        headers = {
+            ['X-Api-Key'] = settings.ApiKey,
+        },
+        sink = ltn12.sink.table(response_body),
+    })
+
+    if not result or status_code ~= 200 then return end
+
+    local body = table.concat(response_body)
+    local pending = json_decode(body)
+    if not pending or not pending.pendingBooks or #pending.pendingBooks == 0 then return end
+
+    local files_written = 0
+
+    for _, book_number in ipairs(pending.pendingBooks) do
+        -- GET the full book data
+        local book_url = settings.ApiUrl .. '/api/sync/macros/' .. book_number
+        local book_response = {}
+        local br, bs = http_request({
+            url = book_url,
+            method = 'GET',
+            headers = {
+                ['X-Api-Key'] = settings.ApiKey,
+            },
+            sink = ltn12.sink.table(book_response),
+        })
+
+        if br and bs == 200 then
+            local book_data = json_decode(table.concat(book_response))
+            if book_data then
+                local book = macro_lib.api_to_book(book_data)
+                local book_idx = book_number - 1
+                local filename = string.format('mcr%d.dat', book_idx)
+                local filepath = macro_path .. '\\' .. filename
+                if macro_lib.write_book(filepath, book) then
+                    files_written = files_written + 1
+                    -- Update hash so we don't re-upload what we just downloaded
+                    local new_hash = macro_lib.hash_file(filepath)
+                    if new_hash then
+                        settings.macro_hashes[filename] = new_hash
+                    end
+                end
+
+                -- DELETE to acknowledge receipt
+                local ack_response = {}
+                http_request({
+                    url = settings.ApiUrl .. '/api/sync/macros/pending/' .. book_number,
+                    method = 'DELETE',
+                    headers = {
+                        ['X-Api-Key'] = settings.ApiKey,
+                    },
+                    sink = ltn12.sink.table(ack_response),
+                })
+            end
+        end
+    end
+
+    if files_written > 0 then
+        config.save(settings)
+        log_success('Macro pull: ' .. files_written .. ' book(s) written.')
+        windower.send_command('input /reloadmacros')
+    end
 end
 
 -----------------------------------------------------------------------
@@ -584,9 +867,9 @@ windower.register_event('prerender', function()
         timer_elapsed = 0
         do_sync()
         -- Bazaar scan only runs if there are nearby bazaar players (early return in scan_bazaars
-        -- if none found). In the worst case, two sequential HTTP calls will briefly freeze the game.
-        -- This is acceptable for a 5-15 minute interval.
+        -- if none found). Macro sync only uploads changed books (hash-compared).
         scan_bazaars()
+        sync_macros(false)
     end
 
     -- Check if session needs auto-flush
@@ -755,6 +1038,24 @@ windower.register_event('addon command', function(command, ...)
         config.save(settings)
         log_success('API URL set to: ' .. url)
 
+    elseif command == 'macros' then
+        local subcommand = args[1] and args[1]:lower() or 'help'
+        if subcommand == 'push' then
+            log('Force-uploading all macro books...')
+            sync_macros(true)
+        elseif subcommand == 'pull' then
+            log('Checking for pending macro updates...')
+            check_pending_macros(nil)
+        elseif subcommand == 'status' then
+            local tracked = 0
+            for _ in pairs(settings.macro_hashes) do
+                tracked = tracked + 1
+            end
+            log('Macro sync: ' .. tracked .. '/20 books tracked.')
+        else
+            log('Macro commands: push | pull | status')
+        end
+
     elseif command == 'help' then
         log('--- Vanalytics Commands ---')
         log('//vanalytics apikey <key> - Set your API key')
@@ -768,6 +1069,9 @@ windower.register_event('addon command', function(command, ...)
         log('  session status  - Show current session info')
         log('  session flush   - Manually upload buffered events')
         log('  session cleanup - Delete old session files')
+        log('  macros push     - Force upload all macro books')
+        log('  macros pull     - Check for pending macro updates')
+        log('  macros status   - Show tracked macro book count')
         log('//vanalytics help         - Show this help')
 
     else
