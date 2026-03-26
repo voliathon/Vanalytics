@@ -9,6 +9,8 @@ _addon.commands = {'vanalytics', 'va'}
 
 local config = require('config')
 local res = require('resources')
+local session = require('session')
+local inventory = require('inventory')
 
 -- Default settings (matches settings.xml)
 local defaults = {
@@ -170,6 +172,26 @@ local function json_encode(val)
     end
     return 'null'
 end
+
+-----------------------------------------------------------------------
+-- Initialize session and inventory modules
+-----------------------------------------------------------------------
+session.init({
+    settings = settings,
+    http_request = http_request,
+    json_encode = json_encode,
+    log = log,
+    log_error = log_error,
+    log_success = log_success,
+})
+
+inventory.init({
+    settings = settings,
+    http_request = http_request,
+    json_encode = json_encode,
+    log = log,
+    log_error = log_error,
+})
 
 -----------------------------------------------------------------------
 -- Read character state from Windower APIs
@@ -461,6 +483,14 @@ local function do_sync()
             last_sync_status = 'Error (' .. tostring(status_code) .. ')'
             log_error('Sync failed with status ' .. tostring(status_code))
         end
+
+    -- Sync inventory diffs
+    local player = windower.ffxi.get_player()
+    local info = windower.ffxi.get_info()
+    if player and info then
+        local server_name = res.servers[info.server] and res.servers[info.server].en or 'Unknown'
+        inventory.sync(player.name, server_name)
+    end
 end
 
 -----------------------------------------------------------------------
@@ -558,6 +588,9 @@ windower.register_event('prerender', function()
         -- This is acceptable for a 5-15 minute interval.
         scan_bazaars()
     end
+
+    -- Check if session needs auto-flush
+    session.check_auto_flush()
 end)
 
 -- TODO: Packet capture for AH history (0x0E7) and bazaar contents (0x109)
@@ -623,6 +656,30 @@ windower.register_event('addon command', function(command, ...)
         -- Restart timer with new interval
         stop_timer()
         start_timer()
+
+    elseif command == 'session' then
+        local subcommand = args[1] and args[1]:lower() or 'help'
+        if subcommand == 'start' then
+            local player = windower.ffxi.get_player()
+            local info = windower.ffxi.get_info()
+            if not player then
+                log_error('Not logged in.')
+                return
+            end
+            local server_name = res.servers[info.server] and res.servers[info.server].en or 'Unknown'
+            local zone_name = res.zones[info.zone] and res.zones[info.zone].en or 'Unknown'
+            session.start(player.name, server_name, zone_name)
+        elseif subcommand == 'stop' then
+            session.stop()
+        elseif subcommand == 'status' then
+            session.print_status()
+        elseif subcommand == 'flush' then
+            session.flush()
+        elseif subcommand == 'cleanup' then
+            session.cleanup()
+        else
+            log('Session commands: start | stop | status | flush | cleanup')
+        end
 
     elseif command == 'dump' then
         local player = windower.ffxi.get_player()
@@ -706,6 +763,11 @@ windower.register_event('addon command', function(command, ...)
         log('//vanalytics status       - Show status')
         log('//vanalytics interval N   - Set sync interval (min: ' .. MIN_INTERVAL .. ')')
         log('//vanalytics dump         - Dump player data to file')
+        log('  session start   - Start a performance tracking session')
+        log('  session stop    - Stop the active session and upload data')
+        log('  session status  - Show current session info')
+        log('  session flush   - Manually upload buffered events')
+        log('  session cleanup - Delete old session files')
         log('//vanalytics help         - Show this help')
 
     else
@@ -746,6 +808,10 @@ windower.register_event('load', function()
     else
         log('Loaded. Waiting for login...')
     end
+end)
+
+windower.register_event('incoming text', function(original, modified, original_mode, modified_mode, blocked)
+    session.on_text(original, modified, original_mode, modified_mode, blocked)
 end)
 
 windower.register_event('unload', function()

@@ -186,7 +186,7 @@ InventoryChange
 
 | Method | Route | Purpose |
 |--------|-------|---------|
-| POST | `/start` | Creates a new Session record, returns `sessionId`. Request body: `{characterName, server, zone}`. Resolves character by name/server and verifies ownership via API key claims (same pattern as `SyncController`). Fails with 409 if character already has an active session. |
+| POST | `/start` | Creates a new Session record, returns `sessionId`. Request body: `{characterName, server, zone}`. Resolves character by name/server and verifies ownership via API key claims (same pattern as `SyncController`). If the character has an existing active session, it is marked as Abandoned and a new session is created. |
 | POST | `/stop` | Marks active session as Completed, sets `EndedAt`. Request body: `{characterName, server}`. Verifies ownership via API key claims. Returns 404 if no active session. |
 | POST | `/events` | Accepts a batch of raw events (`{characterName, server, events[]}`, max 500 events per request), writes to DB. Verifies ownership via API key claims. Returns 400 if no active session. |
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Play, Pause, SkipBack, SkipForward } from 'lucide-react'
 
 interface AnimationEntry {
@@ -27,7 +27,7 @@ interface AnimationControlsProps {
   onStepForward: () => void
   motionCount: number
   motionIndex: number
-  onMotionIndexChange: (index: number) => void
+  onMotionIndexChange: (index: number, skipReset?: boolean) => void
   favoriteAnimation?: { category: string; animationName: string; motionIndex: number }
   onSaveFavorite?: (fav: { category: string; animationName: string; motionIndex: number } | null) => void
 }
@@ -44,49 +44,84 @@ export default function AnimationControls({
 }: AnimationControlsProps) {
   const [selectedCategory, setSelectedCategory] = useState('')
   const [selectedAnimIndex, setSelectedAnimIndex] = useState(0)
-  const initialSelectedRef = useRef(false)
+  const initializedRef = useRef(false)
 
-  // Auto-select favorite animation, or default to Emote category
-  useEffect(() => {
-    if (groups.length > 0 && !selectedCategory) {
-      if (favoriteAnimation) {
-        const favGroup = groups.find(g => g.category === favoriteAnimation.category)
-        if (favGroup) {
-          setSelectedCategory(favoriteAnimation.category)
-          return
-        }
-      }
-      const emote = groups.find(g => g.category === 'Emote')
-      setSelectedCategory(emote ? emote.category : groups[0].category)
-    }
-  }, [groups, selectedCategory])  // eslint-disable-line react-hooks/exhaustive-deps
+  // Stable reference to callbacks to avoid re-triggering effects
+  const callbacksRef = useRef({ onAnimationSelect, onMotionIndexChange })
+  callbacksRef.current = { onAnimationSelect, onMotionIndexChange }
 
-  // Auto-select animation when category changes
-  useEffect(() => {
-    const group = groups.find(g => g.category === selectedCategory)
-    if (group && group.animations.length > 0) {
-      let idx = 0
-      if (!initialSelectedRef.current) {
-        if (favoriteAnimation && selectedCategory === favoriteAnimation.category) {
-          const favIdx = group.animations.findIndex(a => a.name === favoriteAnimation.animationName)
-          if (favIdx >= 0) {
-            idx = favIdx
-            onMotionIndexChange(favoriteAnimation.motionIndex)
-          }
-        } else if (selectedCategory === 'Emote') {
-          const emoteIdx = group.animations.findIndex(a => a.name === 'Emote')
-          if (emoteIdx >= 0) idx = emoteIdx
-        }
-        initialSelectedRef.current = true
-      }
-      setSelectedAnimIndex(idx)
-      onAnimationSelect(group.animations[idx].paths)
+  // Select a category + animation + motion and fire callbacks.
+  // This is used for both initialization and user-initiated category changes.
+  const selectAnimation = useCallback((category: string, animIdx: number, motion?: number) => {
+    const group = groups.find(g => g.category === category)
+    if (!group || group.animations.length === 0) return
+    const idx = Math.min(animIdx, group.animations.length - 1)
+    setSelectedCategory(category)
+    setSelectedAnimIndex(idx)
+    callbacksRef.current.onAnimationSelect(group.animations[idx].paths)
+    if (motion !== undefined) {
+      callbacksRef.current.onMotionIndexChange(motion, true)
     }
-  }, [selectedCategory]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [groups])
+
+  // ONE initialization effect: runs when groups become available (or change).
+  // Picks favorite if available, otherwise defaults to Emote bow.
+  // Only runs ONCE per component mount (guarded by initializedRef).
+  useEffect(() => {
+    if (groups.length === 0 || initializedRef.current) return
+    initializedRef.current = true
+
+    // Try favorite first
+    if (favoriteAnimation) {
+      const favGroup = groups.find(g => g.category === favoriteAnimation.category)
+      if (favGroup) {
+        const favAnimIdx = favGroup.animations.findIndex(a => a.name === favoriteAnimation.animationName)
+        selectAnimation(favoriteAnimation.category, favAnimIdx >= 0 ? favAnimIdx : 0, favoriteAnimation.motionIndex)
+        return
+      }
+    }
+
+    // Default: Emote category, "Emote" animation, motion 0
+    const emote = groups.find(g => g.category === 'Emote')
+    const category = emote ? emote.category : groups[0].category
+    let animIdx = 0
+    if (category === 'Emote') {
+      const group = groups.find(g => g.category === category)
+      const emoteIdx = group?.animations.findIndex(a => a.name === 'Emote') ?? -1
+      if (emoteIdx >= 0) animIdx = emoteIdx
+    }
+    selectAnimation(category, animIdx)
+  }, [groups, favoriteAnimation, selectAnimation])
+
+  // If favorite arrives AFTER initialization (async character load),
+  // re-initialize with the favorite.
+  const prevFavoriteRef = useRef(favoriteAnimation)
+  useEffect(() => {
+    if (prevFavoriteRef.current === favoriteAnimation) return
+    prevFavoriteRef.current = favoriteAnimation
+    if (!favoriteAnimation || !initializedRef.current) return
+
+    const favGroup = groups.find(g => g.category === favoriteAnimation.category)
+    if (favGroup) {
+      const favAnimIdx = favGroup.animations.findIndex(a => a.name === favoriteAnimation.animationName)
+      selectAnimation(favoriteAnimation.category, favAnimIdx >= 0 ? favAnimIdx : 0, favoriteAnimation.motionIndex)
+    }
+  }, [favoriteAnimation, groups, selectAnimation])
 
   const currentGroup = groups.find(g => g.category === selectedCategory)
   const animations = currentGroup?.animations ?? []
 
+  // User changes category dropdown
+  const handleCategoryChange = (category: string) => {
+    const group = groups.find(g => g.category === category)
+    if (group && group.animations.length > 0) {
+      setSelectedCategory(category)
+      setSelectedAnimIndex(0)
+      onAnimationSelect(group.animations[0].paths)
+    }
+  }
+
+  // User changes animation dropdown
   const handleAnimChange = (idx: number) => {
     setSelectedAnimIndex(idx)
     if (animations[idx]) {
@@ -102,7 +137,7 @@ export default function AnimationControls({
 
   const handleToggleFavorite = () => {
     if (isFavorite) {
-      onSaveFavorite?.(null)  // clear favorite
+      onSaveFavorite?.(null)
     } else {
       onSaveFavorite?.({ category: selectedCategory, animationName: currentAnimName, motionIndex })
     }
@@ -117,7 +152,7 @@ export default function AnimationControls({
       <div className="flex gap-2">
         <select
           value={selectedCategory}
-          onChange={e => setSelectedCategory(e.target.value)}
+          onChange={e => handleCategoryChange(e.target.value)}
           className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200 flex-1"
         >
           {groups.map(g => (

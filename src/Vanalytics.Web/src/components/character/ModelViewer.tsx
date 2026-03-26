@@ -41,12 +41,20 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
   const [motionCount, setMotionCount] = useState(0)
   const [motionIndex, setMotionIndex] = useState(0)
   const seekFnRef = useRef<((frame: number) => void) | null>(null)
+  const skipMotionResetRef = useRef(false)
 
-  // Reset motion index when animation changes
+  // Reset motion index when animation changes (unless a favorite was just applied)
   useEffect(() => {
     if (animPaths.length === 0) return
+    if (skipMotionResetRef.current) { skipMotionResetRef.current = false; return }
     setMotionIndex(0)
   }, [animPaths])
+
+  // Wrap setMotionIndex so AnimationControls can signal "don't reset this"
+  const setMotionIndexWithSkip = (idx: number, skipReset?: boolean) => {
+    if (skipReset) skipMotionResetRef.current = true
+    setMotionIndex(idx)
+  }
 
   if (loading) return <ViewerShell><Loader2 className="h-6 w-6 animate-spin text-gray-600" /></ViewerShell>
   if (!isSupported) return <ViewerShell><MonitorSmartphone className="h-8 w-8 text-gray-600 mb-2" /><p className="text-sm text-gray-400">3D model viewer requires Chrome or Edge</p></ViewerShell>
@@ -107,7 +115,7 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
         onStepForward={() => seekFnRef.current?.(Math.min(animTotal - 1, animFrame + 1))}
         motionCount={motionCount}
         motionIndex={motionIndex}
-        onMotionIndexChange={setMotionIndex}
+        onMotionIndexChange={setMotionIndexWithSkip}
         favoriteAnimation={favoriteAnimation}
         onSaveFavorite={onSaveFavorite}
       />

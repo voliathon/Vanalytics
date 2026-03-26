@@ -81,6 +81,7 @@ builder.Services.AddScoped<OAuthService>();
 builder.Services.AddSingleton<RateLimiter>();
 builder.Services.AddSingleton<EconomyRateLimiter>();
 builder.Services.AddSingleton<LoginRateLimiter>();
+builder.Services.AddSingleton<SessionRateLimiter>();
 
 // Item image storage: Azure Blob in production, local filesystem in dev
 if (!string.IsNullOrEmpty(builder.Configuration["AzureStorage:ConnectionString"]))

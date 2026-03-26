@@ -27,6 +27,8 @@ import ForumThreadListPage from './pages/ForumThreadListPage'
 import ForumThreadPage from './pages/ForumThreadPage'
 import ForumNewThreadPage from './pages/ForumNewThreadPage'
 import ForumSearchPage from './pages/ForumSearchPage'
+import SessionsPage from './pages/SessionsPage'
+import SessionDetailPage from './pages/SessionDetailPage'
 
 function SamlCodeHandler() {
   const { samlExchange } = useAuth()
@@ -111,6 +113,8 @@ export default function App() {
             <Route path="/items" element={<ProtectedRoute><ItemDatabasePage /></ProtectedRoute>} />
             <Route path="/items/:id" element={<ProtectedRoute><ItemDetailPage /></ProtectedRoute>} />
             <Route path="/bazaar" element={<ProtectedRoute><BazaarActivityPage /></ProtectedRoute>} />
+            <Route path="/sessions" element={<ProtectedRoute><SessionsPage /></ProtectedRoute>} />
+            <Route path="/sessions/:id" element={<ProtectedRoute><SessionDetailPage /></ProtectedRoute>} />
             <Route path="/setup" element={<ProtectedRoute><SetupGuidePage /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute requiredRole="Admin"><AdminUsersPage /></ProtectedRoute>} />
             <Route path="/admin/data" element={<ProtectedRoute requiredRole="Admin"><AdminItemsPage /></ProtectedRoute>} />

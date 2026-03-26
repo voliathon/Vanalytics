@@ -82,6 +82,43 @@ public class CharactersController : ControllerBase
         });
     }
 
+    [HttpGet("{id:guid}/inventory")]
+    public async Task<IActionResult> GetInventory(Guid id)
+    {
+        var userId = GetUserId();
+        var character = await _db.Characters.FirstOrDefaultAsync(c => c.Id == id);
+
+        if (character is null) return NotFound();
+        if (character.UserId != userId) return Forbid();
+
+        var items = await _db.CharacterInventories
+            .Where(i => i.CharacterId == id)
+            .Join(_db.GameItems,
+                ci => ci.ItemId,
+                gi => gi.ItemId,
+                (ci, gi) => new
+                {
+                    ci.ItemId,
+                    Bag = ci.Bag.ToString(),
+                    ci.SlotIndex,
+                    ci.Quantity,
+                    ci.LastSeenAt,
+                    ItemName = gi.Name ?? gi.NameJa ?? "Unknown",
+                    gi.IconPath,
+                    gi.Category,
+                    gi.StackSize
+                })
+            .OrderBy(i => i.Bag)
+            .ThenBy(i => i.ItemName)
+            .ToListAsync();
+
+        var grouped = items
+            .GroupBy(i => i.Bag)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return Ok(grouped);
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {

@@ -10,6 +10,7 @@ import EquipmentGrid from '../components/character/EquipmentGrid'
 import StatusPanel from '../components/character/StatusPanel'
 import EquipmentSwapModal from '../components/character/EquipmentSwapModal'
 import FullscreenViewer from '../components/character/FullscreenViewer'
+import InventoryTab from '../components/character/InventoryTab'
 
 const STAT_TABS = ['Jobs', 'Crafting'] as const
 type StatTab = typeof STAT_TABS[number]
@@ -25,6 +26,8 @@ export default function CharacterDetailPage() {
   const [itemCache, setItemCache] = useState<Map<number, GameItemDetail>>(new Map())
 
   useEffect(() => {
+    setCharacter(null)
+    setLoading(true)
     api<CharacterDetail>(`/api/characters/${id}`)
       .then(setCharacter)
       .catch(() => setCharacter(null))
@@ -159,6 +162,7 @@ export default function CharacterDetailPage() {
         <h2 className="text-lg font-semibold mb-3">Equipment</h2>
         <div className="flex gap-4 mt-4">
           <ModelViewer
+            key={character.id}
             race={character.race}
             gender={character.gender}
             gear={localGear}
@@ -175,6 +179,10 @@ export default function CharacterDetailPage() {
             />
           </div>
         </div>
+      </section>
+
+      <section className="mb-8">
+        <InventoryTab characterId={character.id} />
       </section>
 
       {swapSlot && (

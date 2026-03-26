@@ -11,11 +11,12 @@ import { SyncProvider } from '../context/SyncContext'
 import SyncBanner from './SyncBanner'
 import { FfxiFileSystemProvider } from '../context/FfxiFileSystemContext'
 
-type SectionName = 'database' | 'economy' | 'server' | 'admin'
+type SectionName = 'database' | 'economy' | 'performance' | 'server' | 'admin'
 
 function getSection(pathname: string): SectionName | null {
   if (pathname.startsWith('/items') || pathname.startsWith('/npcs') || pathname.startsWith('/zones')) return 'database'
   if (pathname.startsWith('/bazaar')) return 'economy'
+  if (pathname.startsWith('/sessions')) return 'performance'
   if (pathname.startsWith('/server/')) return 'server'
   if (pathname.startsWith('/admin')) return 'admin'
   return null
@@ -157,6 +158,10 @@ function LayoutInner() {
 
           <SidebarSection label="Economy" icon={<Store className="h-4 w-4 shrink-0" />} isOpen={openSection === 'economy'} onToggle={() => toggleSection('economy')}>
             <SidebarLink to="/bazaar" label="Bazaar" icon={<Store className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
+          </SidebarSection>
+
+          <SidebarSection label="Performance" icon={<Swords className="h-4 w-4 shrink-0" />} isOpen={openSection === 'performance'} onToggle={() => toggleSection('performance')}>
+            <SidebarLink to="/sessions" label="Sessions" icon={<Radio className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
           </SidebarSection>
 
           <SidebarSection label="Server" icon={<Radio className="h-4 w-4 shrink-0" />} isOpen={openSection === 'server'} onToggle={() => toggleSection('server')}>

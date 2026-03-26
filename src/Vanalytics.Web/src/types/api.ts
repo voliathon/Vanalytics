@@ -496,3 +496,76 @@ export interface ModelMapping {
   slotId: number
   modelId: number
 }
+
+// Session types
+export interface SessionSummary {
+  id: string
+  characterId: string
+  characterName: string
+  server: string
+  zone: string
+  startedAt: string
+  endedAt: string | null
+  status: 'Active' | 'Completed' | 'Abandoned'
+  totalDamage: number
+  gilEarned: number
+  mobsKilled: number
+  itemsDropped: number
+}
+
+export interface SessionDetail extends SessionSummary {
+  dpsAverage: number
+  gilPerHour: number
+  expGained: number
+  healingDone: number
+  eventCount: number
+}
+
+export interface SessionEvent {
+  id: number
+  eventType: string
+  timestamp: string
+  source: string
+  target: string
+  value: number
+  ability: string | null
+  itemId: number | null
+  zone: string
+}
+
+export interface SessionTimelineEntry {
+  timestamp: string
+  damage: number
+  healing: number
+  gil: number
+  kills: number
+}
+
+export interface SessionListResponse {
+  totalCount: number
+  page: number
+  pageSize: number
+  sessions: SessionSummary[]
+}
+
+export interface SessionEventsResponse {
+  totalCount: number
+  page: number
+  pageSize: number
+  events: SessionEvent[]
+}
+
+// Inventory types
+export interface InventoryItem {
+  itemId: number
+  bag: string
+  slotIndex: number
+  quantity: number
+  lastSeenAt: string
+  itemName: string
+  iconPath: string | null
+  category: string | null
+  stackSize: number
+}
+
+export type InventoryByBag = Record<string, InventoryItem[]>

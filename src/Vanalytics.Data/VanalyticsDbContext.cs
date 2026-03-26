@@ -22,6 +22,10 @@ public class VanalyticsDbContext(DbContextOptions<VanalyticsDbContext> options)
     public DbSet<ItemModelMapping> ItemModelMappings => Set<ItemModelMapping>();
     public DbSet<NpcPool> NpcPools => Set<NpcPool>();
     public DbSet<Zone> Zones => Set<Zone>();
+    public DbSet<Session> Sessions => Set<Session>();
+    public DbSet<SessionEvent> SessionEvents => Set<SessionEvent>();
+    public DbSet<CharacterInventory> CharacterInventories => Set<CharacterInventory>();
+    public DbSet<InventoryChange> InventoryChanges => Set<InventoryChange>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
