@@ -220,7 +220,8 @@ export default function CharacterDetailPage() {
           ))}
         </div>
 
-        {gearTab === 'Equipment' && (
+        {/* Equipment tab: hidden instead of unmounted to preserve ModelViewer state */}
+        <div className={gearTab === 'Equipment' ? '' : 'hidden'}>
           <div className="flex gap-4">
             <ModelViewer
               key={character.id}
@@ -240,7 +241,7 @@ export default function CharacterDetailPage() {
               />
             </div>
           </div>
-        )}
+        </div>
 
         {gearTab === 'Inventory' && (
           <InventoryTab characterId={character.id} />
