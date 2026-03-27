@@ -7,6 +7,11 @@ namespace Vanalytics.Data.Migrations
     /// <inheritdoc />
     public partial class AddForumFullTextSearch : Migration
     {
+        /// <summary>
+        /// Full-text DDL (CREATE FULLTEXT CATALOG/INDEX) cannot run inside a transaction.
+        /// </summary>
+        protected override bool SuppressTransaction => true;
+
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
