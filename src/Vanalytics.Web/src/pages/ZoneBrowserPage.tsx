@@ -34,6 +34,7 @@ export default function ZoneBrowserPage() {
   const [zoneData, setZoneData] = useState<ParsedZone | null>(null)
   const [cameraMode, setCameraMode] = useState<'orbit' | 'fly'>('fly')
   const [fogDensity, setFogDensity] = useState(0.5)  // 0=off, 0.5=default, 1=thick
+  const [timeOfDay, setTimeOfDay] = useState(12)    // 0-24 hour clock
   const [flySpeed, setFlySpeed] = useState<number | null>(null)
   const [minimapTextures, setMinimapTextures] = useState<ParsedTexture[]>([])
   const [showSpawns, setShowSpawns] = useState(false)
@@ -276,6 +277,7 @@ export default function ZoneBrowserPage() {
           <ThreeZoneViewer
             zoneData={zoneData}
             fogDensity={fogDensity}
+            timeOfDay={timeOfDay}
             onFlySpeedChange={setFlySpeed}
             cameraMode={cameraMode}
             spawns={spawnFilter ? filteredSpawns : spawns}
@@ -377,7 +379,7 @@ export default function ZoneBrowserPage() {
                 : 'text-gray-400 hover:text-gray-200'
             }`}
           >
-            Fog
+            Atmosphere
           </button>
           {fogDensity > 0 && (
             <input
@@ -388,9 +390,25 @@ export default function ZoneBrowserPage() {
               value={fogDensity}
               onChange={(e) => setFogDensity(parseFloat(e.target.value))}
               className="w-16 h-1 accent-blue-500"
+              title="Fog density"
             />
           )}
         </div>
+        {fogDensity > 0 && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 shadow-lg">
+            <span className="text-xs text-gray-400 w-6">{Math.floor(timeOfDay).toString().padStart(2, '0')}h</span>
+            <input
+              type="range"
+              min="0"
+              max="24"
+              step="0.5"
+              value={timeOfDay}
+              onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
+              className="w-20 h-1 accent-amber-500"
+              title={`Time of day: ${Math.floor(timeOfDay).toString().padStart(2, '0')}:${((timeOfDay % 1) * 60).toString().padStart(2, '0')}`}
+            />
+          </div>
+        )}
         <button
           onClick={() => setShowSpawns(prev => !prev)}
           title="Toggle spawn markers"

@@ -47,6 +47,7 @@ export interface ParsedZoneMesh {
   indices: number[]       // triangle indices
   materialIndex: number   // texture index (sequential IMG block order)
   blending: number        // MMB blending flag (0=opaque, >0=alpha blend)
+  textureName?: string    // original texture name from MMB model header
 }
 
 export interface ZoneMeshInstance {
