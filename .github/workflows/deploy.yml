@@ -49,6 +49,9 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Resolved version: $VERSION"
 
+      - name: Clear Docker credentials
+        run: docker logout
+
       - name: Build Docker image
         run: |
           docker build -f src/Vanalytics.Api/Dockerfile . \
