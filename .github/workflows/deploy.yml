@@ -49,6 +49,13 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Resolved version: $VERSION"
 
+      - name: Build Docker image
+        run: |
+          docker build -f src/Vanalytics.Api/Dockerfile . \
+            --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
+            -t soveranceacr.azurecr.io/vanalytics:v${{ steps.version.outputs.version }} \
+            -t soveranceacr.azurecr.io/vanalytics:latest
+
       - name: Log in to ACR
         uses: docker/login-action@v3
         with:
@@ -56,12 +63,8 @@ jobs:
           username: ${{ secrets.ACR_USERNAME }}
           password: ${{ secrets.ACR_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: Push Docker image
         run: |
-          docker build -f src/Vanalytics.Api/Dockerfile . \
-            --build-arg APP_VERSION=${{ steps.version.outputs.version }} \
-            -t soveranceacr.azurecr.io/vanalytics:v${{ steps.version.outputs.version }} \
-            -t soveranceacr.azurecr.io/vanalytics:latest
           docker push soveranceacr.azurecr.io/vanalytics:v${{ steps.version.outputs.version }}
           docker push soveranceacr.azurecr.io/vanalytics:latest
 
