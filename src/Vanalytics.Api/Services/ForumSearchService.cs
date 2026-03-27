@@ -45,7 +45,7 @@ public partial class ForumSearchService : IForumSearchService
         var titleMatches = await _db.Database
             .SqlQueryRaw<ThreadMatch>(
                 @"SELECT ft.[KEY] AS ThreadId, ft.RANK AS Rank
-                  FROM FREETEXTTABLE(ForumThreads, Title, {0}) ft",
+                  FROM FREETEXTTABLE(ForumThread, Title, {0}) ft",
                 query)
             .ToListAsync();
 
@@ -53,8 +53,8 @@ public partial class ForumSearchService : IForumSearchService
         var postMatches = await _db.Database
             .SqlQueryRaw<PostMatch>(
                 @"SELECT p.ThreadId, ft.[KEY] AS PostId, ft.RANK AS Rank
-                  FROM FREETEXTTABLE(ForumPosts, Body, {0}) ft
-                  INNER JOIN ForumPosts p ON p.Id = ft.[KEY]
+                  FROM FREETEXTTABLE(ForumPost, Body, {0}) ft
+                  INNER JOIN ForumPost p ON p.Id = ft.[KEY]
                   WHERE p.IsDeleted = 0",
                 query)
             .ToListAsync();
