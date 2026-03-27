@@ -10,10 +10,10 @@ namespace Vanalytics.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // Full-text search requires the FTS component, which may not be
-            // installed in all environments (e.g. Testcontainers).  The search
-            // service falls back to LIKE queries when FTS is unavailable, so
-            // it is safe to skip these statements when the component is missing.
+            // Full-text DDL cannot run inside a transaction, so suppressTransaction: true
+            // is required. The FTS component may not be installed in all environments
+            // (e.g. Testcontainers). The search service falls back to LIKE queries when
+            // FTS is unavailable, so it is safe to skip these statements.
             migrationBuilder.Sql(@"
                 IF (SELECT FULLTEXTSERVICEPROPERTY('IsFullTextInstalled')) = 1
                 BEGIN
@@ -23,7 +23,7 @@ namespace Vanalytics.Data.Migrations
                         EXEC('CREATE FULLTEXT INDEX ON ForumThreads(Title) KEY INDEX PK_ForumThreads WITH STOPLIST = SYSTEM');
                     IF NOT EXISTS (SELECT 1 FROM sys.fulltext_indexes WHERE object_id = OBJECT_ID('ForumPosts'))
                         EXEC('CREATE FULLTEXT INDEX ON ForumPosts(Body) KEY INDEX PK_ForumPosts WITH STOPLIST = SYSTEM');
-                END");
+                END", suppressTransaction: true);
         }
 
         /// <inheritdoc />
@@ -38,7 +38,7 @@ namespace Vanalytics.Data.Migrations
                         EXEC('DROP FULLTEXT INDEX ON ForumThreads');
                     IF EXISTS (SELECT 1 FROM sys.fulltext_catalogs WHERE name = 'ForumFullTextCatalog')
                         EXEC('DROP FULLTEXT CATALOG ForumFullTextCatalog');
-                END");
+                END", suppressTransaction: true);
         }
     }
 }
