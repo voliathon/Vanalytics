@@ -20,6 +20,7 @@ import BazaarActivityPage from './pages/BazaarActivityPage'
 import VanadielClockPage from './pages/VanadielClockPage'
 import PublicProfilePage from './pages/PublicProfilePage'
 import ModelDebugPage from './pages/ModelDebugPage'
+import SessionReportPage from './pages/SessionReportPage'
 import NpcBrowserPage from './pages/NpcBrowserPage'
 import ZoneBrowserPage from './pages/ZoneBrowserPage'
 import ForumCategoryListPage from './pages/ForumCategoryListPage'
@@ -27,8 +28,6 @@ import ForumThreadListPage from './pages/ForumThreadListPage'
 import ForumThreadPage from './pages/ForumThreadPage'
 import ForumNewThreadPage from './pages/ForumNewThreadPage'
 import ForumSearchPage from './pages/ForumSearchPage'
-import SessionsPage from './pages/SessionsPage'
-import SessionDetailPage from './pages/SessionDetailPage'
 
 
 function SamlCodeHandler() {
@@ -114,14 +113,13 @@ export default function App() {
             <Route path="/items" element={<ProtectedRoute><ItemDatabasePage /></ProtectedRoute>} />
             <Route path="/items/:id" element={<ProtectedRoute><ItemDetailPage /></ProtectedRoute>} />
             <Route path="/bazaar" element={<ProtectedRoute><BazaarActivityPage /></ProtectedRoute>} />
-            <Route path="/sessions" element={<ProtectedRoute><SessionsPage /></ProtectedRoute>} />
-            <Route path="/sessions/:id" element={<ProtectedRoute><SessionDetailPage /></ProtectedRoute>} />
-            <Route path="/setup" element={<ProtectedRoute><SetupGuidePage /></ProtectedRoute>} />
+<Route path="/setup" element={<ProtectedRoute><SetupGuidePage /></ProtectedRoute>} />
             <Route path="/admin/users" element={<ProtectedRoute requiredRole="Admin"><AdminUsersPage /></ProtectedRoute>} />
             <Route path="/admin/data" element={<ProtectedRoute requiredRole="Admin"><AdminItemsPage /></ProtectedRoute>} />
             <Route path="/admin/saml" element={<ProtectedRoute requiredRole="Admin"><AdminSamlPage /></ProtectedRoute>} />
             <Route path="/npcs" element={<ProtectedRoute><NpcBrowserPage /></ProtectedRoute>} />
             <Route path="/zones" element={<ProtectedRoute><ZoneBrowserPage /></ProtectedRoute>} />
+            <Route path="/sessions/:id" element={<ProtectedRoute><SessionReportPage /></ProtectedRoute>} />
             <Route path="/debug/models" element={<ProtectedRoute><ModelDebugPage /></ProtectedRoute>} />
 
             {/* Public forum routes */}

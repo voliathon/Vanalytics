@@ -371,6 +371,42 @@ function macros.parse_titles(macro_path)
     return titles
 end
 
+-- Get a fingerprint of all macro DAT file timestamps in the directory.
+-- Returns a table keyed by filename -> timestamp string, using a single dir command.
+-- This is much cheaper than reading/hashing all 200 files.
+function macros.get_file_timestamps(macro_path)
+    local timestamps = {}
+    local handle = io.popen('dir /T:W "' .. macro_path .. '\\mcr*.dat" 2>NUL')
+    if not handle then return timestamps end
+
+    for line in handle:lines() do
+        -- dir output lines look like: "03/25/2026  02:14 PM             7,624 mcr15.dat"
+        local date_str, time_str, filename = line:match('(%d+/%d+/%d+)%s+(%d+:%d+%s*%a+)%s+[%d,]+%s+(mcr%d*%.dat)')
+        if filename then
+            timestamps[filename] = date_str .. ' ' .. time_str
+        end
+    end
+    handle:close()
+
+    return timestamps
+end
+
+-- Check if any DAT file in a book has changed since last check.
+-- Compares file timestamps against a stored fingerprint table.
+-- Returns true if any page file has a different timestamp (or is new).
+function macros.book_files_changed(macro_path, book_number, old_timestamps, new_timestamps)
+    for page = 1, PAGES_PER_BOOK do
+        local idx = macros.file_index(book_number, page)
+        local filename = macros.dat_filename(idx)
+        local old_ts = old_timestamps[filename]
+        local new_ts = new_timestamps[filename]
+        if new_ts and new_ts ~= old_ts then
+            return true
+        end
+    end
+    return false
+end
+
 macros.PAGES_PER_BOOK = PAGES_PER_BOOK
 macros.BOOKS_COUNT = BOOKS_COUNT
 

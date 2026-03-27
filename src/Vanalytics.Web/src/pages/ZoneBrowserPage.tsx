@@ -5,9 +5,11 @@ import type { ParsedZone } from '../lib/ffxi-dat'
 import type { ParsedTexture } from '../lib/ffxi-dat/types'
 import ThreeZoneViewer from '../components/zone/ThreeZoneViewer'
 import MinimapOverlay from '../components/zone/MinimapOverlay'
+import SpawnToolbar from '../components/zone/SpawnToolbar'
+import SpawnInfoCard from '../components/zone/SpawnInfoCard'
 import { parseMinimapDat } from '../lib/ffxi-dat/MinimapParser'
-import { parseSpawnDat } from '../lib/ffxi-dat/SpawnParser'
-import type { SpawnPoint } from '../lib/ffxi-dat/SpawnParser'
+import { api } from '../api/client'
+import type { ZoneSpawnDto } from '../types/api'
 import { Search, X, Shuffle, ChevronRight, Clock, Users } from 'lucide-react'
 
 interface ZoneEntry {
@@ -30,12 +32,17 @@ export default function ZoneBrowserPage() {
   const [selectedExpansion, setSelectedExpansion] = useState<string | null>(null)
   const [selected, setSelected] = useState<ZoneEntry | null>(null)
   const [zoneData, setZoneData] = useState<ParsedZone | null>(null)
-  const [cameraMode, setCameraMode] = useState<'orbit' | 'fly'>('orbit')
-  const [fogDensity, setFogDensity] = useState(0)  // 0=off, 0.5=default, 1=thick
+  const [cameraMode, setCameraMode] = useState<'orbit' | 'fly'>('fly')
+  const [fogDensity, setFogDensity] = useState(0.5)  // 0=off, 0.5=default, 1=thick
+  const [timeOfDay, setTimeOfDay] = useState(12)    // 0-24 hour clock
   const [flySpeed, setFlySpeed] = useState<number | null>(null)
   const [minimapTextures, setMinimapTextures] = useState<ParsedTexture[]>([])
   const [showSpawns, setShowSpawns] = useState(false)
-  const [spawnPoints, setSpawnPoints] = useState<SpawnPoint[]>([])
+  const [spawns, setSpawns] = useState<ZoneSpawnDto[]>([])
+  const [spawnFilter, setSpawnFilter] = useState('')
+  const [selectedSpawn, setSelectedSpawn] = useState<ZoneSpawnDto | null>(null)
+  const [showSkybeams, setShowSkybeams] = useState(true)
+  const [hoveredSpawn, setHoveredSpawn] = useState<ZoneSpawnDto | null>(null)
   const [loading, setLoading] = useState(false)
   const [parseLog, setParseLog] = useState<string[]>([])
   const [browserOpen, setBrowserOpen] = useState(false)
@@ -97,7 +104,9 @@ export default function ZoneBrowserPage() {
     setBrowserOpen(false)
     setZoneData(null)
     setMinimapTextures([])
-    setSpawnPoints([])
+    setSpawns([])
+    setSpawnFilter('')
+    setSelectedSpawn(null)
     setShowSpawns(false)
     setParseLog([])
     setLogOpen(true)
@@ -171,16 +180,26 @@ export default function ZoneBrowserPage() {
     loadZone(pick)
   }, [allZones, selectedExpansion, loadZone])
 
-  // Toggle spawn markers — load from npcPath on first enable
-  const handleToggleSpawns = useCallback(async () => {
-    if (!showSpawns && spawnPoints.length === 0 && selected?.npcPath) {
-      try {
-        const buffer = await ffxi.readFile(selected.npcPath)
-        setSpawnPoints(parseSpawnDat(buffer))
-      } catch { /* npcPath unavailable or unreadable */ }
+  // Load spawns from API when spawn display is first enabled
+  useEffect(() => {
+    if (!showSpawns || spawns.length > 0 || !selected) return
+    api<ZoneSpawnDto[]>(`/api/zones/${selected.id}/spawns`)
+      .then(setSpawns)
+      .catch(() => {})
+  }, [showSpawns, spawns.length, selected])
+
+  const filteredSpawns = spawnFilter
+    ? spawns.filter(s => s.name.toLowerCase().includes(spawnFilter.toLowerCase()))
+    : spawns
+
+  // Escape key dismisses selected spawn
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedSpawn(null)
     }
-    setShowSpawns(prev => !prev)
-  }, [showSpawns, spawnPoints.length, selected, ffxi])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // ── Not configured states ──
   if (!ffxi.isSupported) {
@@ -258,10 +277,31 @@ export default function ZoneBrowserPage() {
           <ThreeZoneViewer
             zoneData={zoneData}
             fogDensity={fogDensity}
+            timeOfDay={timeOfDay}
             onFlySpeedChange={setFlySpeed}
             cameraMode={cameraMode}
-            spawnMarkers={spawnPoints}
+            spawns={spawnFilter ? filteredSpawns : spawns}
+            filteredSpawns={spawnFilter ? filteredSpawns : undefined}
             showSpawns={showSpawns}
+            showSkybeams={showSkybeams && !!spawnFilter}
+            onSpawnHover={setHoveredSpawn}
+            onSpawnClick={setSelectedSpawn}
+          />
+        )}
+
+        {/* Hovered spawn tooltip */}
+        {hoveredSpawn && (
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 px-2 py-1 rounded bg-gray-900/90 text-xs text-gray-200 pointer-events-none">
+            {hoveredSpawn.name}
+            {hoveredSpawn.minLevel > 0 && ` (Lv.${hoveredSpawn.minLevel}–${hoveredSpawn.maxLevel})`}
+          </div>
+        )}
+
+        {/* Selected spawn info card */}
+        {selectedSpawn && (
+          <SpawnInfoCard
+            spawn={selectedSpawn}
+            onClose={() => setSelectedSpawn(null)}
           />
         )}
       </div>
@@ -339,7 +379,7 @@ export default function ZoneBrowserPage() {
                 : 'text-gray-400 hover:text-gray-200'
             }`}
           >
-            Fog
+            Atmosphere
           </button>
           {fogDensity > 0 && (
             <input
@@ -350,11 +390,27 @@ export default function ZoneBrowserPage() {
               value={fogDensity}
               onChange={(e) => setFogDensity(parseFloat(e.target.value))}
               className="w-16 h-1 accent-blue-500"
+              title="Fog density"
             />
           )}
         </div>
+        {fogDensity > 0 && (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 shadow-lg">
+            <span className="text-xs text-gray-400 w-6">{Math.floor(timeOfDay).toString().padStart(2, '0')}h</span>
+            <input
+              type="range"
+              min="0"
+              max="24"
+              step="0.5"
+              value={timeOfDay}
+              onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
+              className="w-20 h-1 accent-amber-500"
+              title={`Time of day: ${Math.floor(timeOfDay).toString().padStart(2, '0')}:${((timeOfDay % 1) * 60).toString().padStart(2, '0')}`}
+            />
+          </div>
+        )}
         <button
-          onClick={handleToggleSpawns}
+          onClick={() => setShowSpawns(prev => !prev)}
           title="Toggle spawn markers"
           className={`flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border shadow-lg backdrop-blur transition-colors ${
             showSpawns
@@ -365,6 +421,16 @@ export default function ZoneBrowserPage() {
           <Users className="h-3 w-3" />
           Spawns
         </button>
+        {showSpawns && spawns.length > 0 && (
+          <SpawnToolbar
+            filter={spawnFilter}
+            onFilterChange={setSpawnFilter}
+            showSkybeams={showSkybeams}
+            onToggleSkybeams={() => setShowSkybeams(s => !s)}
+            spawnCount={spawns.length}
+            filteredCount={filteredSpawns.length}
+          />
+        )}
         {cameraMode === 'fly' && flySpeed !== null && (
           <div className="px-2.5 py-1 rounded-lg bg-gray-900/90 backdrop-blur border border-gray-700/50 shadow-lg text-xs text-gray-400" title="Scroll wheel to adjust fly speed">
             Speed <span className="font-mono text-gray-200">{flySpeed.toFixed(2)}</span>

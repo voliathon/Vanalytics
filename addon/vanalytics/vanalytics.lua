@@ -313,6 +313,9 @@ local function find_macro_path()
     return user_dir .. '\\' .. best_dir
 end
 
+-- Stored file timestamps from last macro check (avoids re-hashing unchanged files)
+local macro_file_timestamps = {}
+
 local function sync_macros(force)
     if settings.ApiKey == '' then return end
 
@@ -328,26 +331,45 @@ local function sync_macros(force)
         return
     end
 
+    -- Single dir command to get all file timestamps (cheap compared to reading 200 files)
+    local new_timestamps = macro_lib.get_file_timestamps(macro_path)
+
     local changed_books = {}
     local new_hashes = {}
     local books_found = 0
-    local titles = macro_lib.parse_titles(macro_path)
+    local titles = nil  -- lazy-loaded only if needed
 
     for book_num = 1, macro_lib.BOOKS_COUNT do
         local hash_key = 'book' .. book_num
-        local hash = macro_lib.hash_book(macro_path, book_num)
-        if hash then
-            books_found = books_found + 1
-            local stored_hash = settings.macro_hashes[hash_key]
-            if force or hash ~= stored_hash then
-                local book = macro_lib.parse_book(macro_path, book_num)
-                if book then
-                    table.insert(changed_books, macro_lib.book_to_api(book, book_num, hash, titles[book_num]))
-                    new_hashes[hash_key] = hash
+
+        -- Fast path: skip books whose files haven't been modified since last check
+        if not force and not macro_lib.book_files_changed(macro_path, book_num, macro_file_timestamps, new_timestamps) then
+            -- Check if we have a stored hash (i.e., we've seen this book before)
+            if settings.macro_hashes[hash_key] then
+                books_found = books_found + 1
+            end
+        else
+            -- Files changed (or force) — compute hash to confirm actual content change
+            local hash = macro_lib.hash_book(macro_path, book_num)
+            if hash then
+                books_found = books_found + 1
+                local stored_hash = settings.macro_hashes[hash_key]
+                if force or hash ~= stored_hash then
+                    if not titles then
+                        titles = macro_lib.parse_titles(macro_path)
+                    end
+                    local book = macro_lib.parse_book(macro_path, book_num)
+                    if book then
+                        table.insert(changed_books, macro_lib.book_to_api(book, book_num, hash, titles[book_num]))
+                        new_hashes[hash_key] = hash
+                    end
                 end
             end
         end
     end
+
+    -- Update stored timestamps for next cycle
+    macro_file_timestamps = new_timestamps
 
     if books_found == 0 then
         log_error('No macro DAT files found at: ' .. macro_path)
@@ -355,7 +377,6 @@ local function sync_macros(force)
     end
 
     if #changed_books == 0 then
-        log('Macros: no changes detected (' .. books_found .. ' books checked).')
         return
     end
 
@@ -497,6 +518,7 @@ session.init({
     settings = settings,
     http_request = http_request,
     json_encode = json_encode,
+    json_decode = json_decode,
     log = log,
     log_error = log_error,
     log_success = log_success,
@@ -889,8 +911,28 @@ local function scan_bazaars()
     })
 end
 
+-----------------------------------------------------------------------
+-- Work queue: spreads sync tasks across frames to avoid stutter.
+-- Each entry is a function. One function runs per frame until the queue
+-- is empty.
+-----------------------------------------------------------------------
+local work_queue = {}
+
+local function enqueue_sync_work()
+    -- Queue each sync task as a separate frame's work
+    table.insert(work_queue, function() do_sync() end)
+    table.insert(work_queue, function() scan_bazaars() end)
+    table.insert(work_queue, function() sync_macros(false) end)
+end
+
 -- Single prerender handler registered once at load time
 windower.register_event('prerender', function()
+    -- Process one queued work item per frame
+    if #work_queue > 0 then
+        local task = table.remove(work_queue, 1)
+        task()
+    end
+
     if not timer_active then return end
 
     local now = os.clock()
@@ -899,11 +941,7 @@ windower.register_event('prerender', function()
 
     if timer_elapsed >= timer_interval_seconds then
         timer_elapsed = 0
-        do_sync()
-        -- Bazaar scan only runs if there are nearby bazaar players (early return in scan_bazaars
-        -- if none found). Macro sync only uploads changed books (hash-compared).
-        scan_bazaars()
-        sync_macros(false)
+        enqueue_sync_work()
     end
 
     -- Check if session needs auto-flush
@@ -994,8 +1032,11 @@ windower.register_event('addon command', function(command, ...)
             session.flush()
         elseif subcommand == 'cleanup' then
             session.cleanup()
+        elseif subcommand == 'debug' then
+            local enabled = session.toggle_debug()
+            log('Session debug mode: ' .. (enabled and 'ON' or 'OFF'))
         else
-            log('Session commands: start | stop | status | flush | cleanup')
+            log('Session commands: start | stop | status | flush | cleanup | debug')
         end
 
     elseif command == 'dump' then
@@ -1119,21 +1160,22 @@ windower.register_event('addon command', function(command, ...)
 
     elseif command == 'help' then
         log('--- Vanalytics Commands ---')
-        log('//vanalytics apikey <key> - Set your API key')
-        log('//vanalytics url <url>    - Set API URL (or: local / prod)')
-        log('//vanalytics sync         - Sync now')
-        log('//vanalytics status       - Show status')
-        log('//vanalytics interval N   - Set sync interval (min: ' .. MIN_INTERVAL .. ')')
-        log('//vanalytics dump         - Dump player data to file')
-        log('  session start   - Start a performance tracking session')
-        log('  session stop    - Stop the active session and upload data')
-        log('  session status  - Show current session info')
-        log('  session flush   - Manually upload buffered events')
-        log('  session cleanup - Delete old session files')
-        log('  macros push     - Force upload all macro books')
-        log('  macros pull     - Check for pending macro updates')
-        log('  macros status   - Show tracked macro book count')
-        log('//vanalytics help         - Show this help')
+        log('//va apikey <key> - Set your API key')
+        log('//va url <url>    - Set API URL (or: local / prod)')
+        log('//va sync         - Sync now')
+        log('//va status       - Show status')
+        log('//va interval N   - Set sync interval (min: ' .. MIN_INTERVAL .. ')')
+        log('//va dump         - Dump player data to file')
+        log('//va session start   - Start a performance tracking session')
+        log('//va session stop    - Stop the active session and upload data')
+        log('//va session status  - Show current session info')
+        log('//va session flush   - Manually upload buffered events')
+        log('//va session cleanup - Delete old session files')
+        log('//va session debug   - Toggle debug mode (logs unmatched chat lines)')
+        log('//va macros push     - Force upload all macro books')
+        log('//va macros pull     - Check for pending macro updates')
+        log('//va macros status   - Show tracked macro book count')
+        log('//va help         - Show this help')
 
     else
         log_error('Unknown command: ' .. command .. '. Type //vanalytics help')
@@ -1181,4 +1223,7 @@ end)
 
 windower.register_event('unload', function()
     stop_timer()
+    if session.is_active() then
+        session.stop()
+    end
 end)

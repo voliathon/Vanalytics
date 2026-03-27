@@ -18,5 +18,10 @@ public enum SessionEventType
     SpellCast,
     ExpGain,
     LimitGain,
-    CapacityGain
+    CapacityGain,
+    ItemLost,
+    TreasureHunter,
+    Miss,
+    Parry,
+    CriticalHit
 }

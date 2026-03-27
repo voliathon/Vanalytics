@@ -11,13 +11,12 @@ import { SyncProvider } from '../context/SyncContext'
 import SyncBanner from './SyncBanner'
 import { FfxiFileSystemProvider } from '../context/FfxiFileSystemContext'
 
-type SectionName = 'database' | 'economy' | 'performance' | 'server' | 'admin'
+type SectionName = 'database' | 'economy' | 'server' | 'admin'
 
 function getSection(pathname: string): SectionName | null {
   if (pathname.startsWith('/items') || pathname.startsWith('/npcs') || pathname.startsWith('/zones')) return 'database'
   if (pathname.startsWith('/bazaar')) return 'economy'
-  if (pathname.startsWith('/sessions')) return 'performance'
-  if (pathname.startsWith('/server/')) return 'server'
+if (pathname.startsWith('/server/')) return 'server'
   if (pathname.startsWith('/admin')) return 'admin'
   return null
 }
@@ -103,6 +102,14 @@ function LayoutInner() {
   const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { isOpen: loginOpen, close: closeLogin } = useLoginModal()
+  const [version, setVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/health')
+      .then((r) => r.json())
+      .then((d) => setVersion(d.version ?? null))
+      .catch(() => {})
+  }, [])
 
   const { pathname } = useLocation()
   const [openSection, setOpenSection] = useState<SectionName | null>(() => getSection(pathname))
@@ -150,7 +157,7 @@ function LayoutInner() {
         <nav className="flex-1 overflow-y-auto space-y-1 px-3 py-4">
           <SidebarLink to="/characters" label="Characters" icon={<Swords className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
 
-          <SidebarSection label="Database" icon={<Database className="h-4 w-4 shrink-0" />} isOpen={openSection === 'database'} onToggle={() => toggleSection('database')}>
+          <SidebarSection label="Data" icon={<Database className="h-4 w-4 shrink-0" />} isOpen={openSection === 'database'} onToggle={() => toggleSection('database')}>
             <SidebarLink to="/items" end={false} label="Items" icon={<Package className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
             <SidebarLink to="/npcs" label="NPCs" icon={<Bug className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
             <SidebarLink to="/zones" label="Zones" icon={<Map className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
@@ -160,11 +167,7 @@ function LayoutInner() {
             <SidebarLink to="/bazaar" label="Bazaar" icon={<Store className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
           </SidebarSection>
 
-          <SidebarSection label="Performance" icon={<Swords className="h-4 w-4 shrink-0" />} isOpen={openSection === 'performance'} onToggle={() => toggleSection('performance')}>
-            <SidebarLink to="/sessions" label="Sessions" icon={<Radio className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
-          </SidebarSection>
-
-          <SidebarSection label="Server" icon={<Radio className="h-4 w-4 shrink-0" />} isOpen={openSection === 'server'} onToggle={() => toggleSection('server')}>
+<SidebarSection label="Server" icon={<Radio className="h-4 w-4 shrink-0" />} isOpen={openSection === 'server'} onToggle={() => toggleSection('server')}>
             <SidebarLink to="/server/status" end={false} label="Status" icon={<Radio className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
             <SidebarLink to="/server/clock" label="Clock" icon={<Clock className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
           </SidebarSection>
@@ -181,6 +184,10 @@ function LayoutInner() {
             </SidebarSection>
           )}
         </nav>
+
+        {version && (
+          <div className="px-4 py-2 text-[11px] text-gray-600">v{version}</div>
+        )}
 
         {/* User profile */}
         <NavLink

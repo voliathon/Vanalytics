@@ -27,6 +27,10 @@ export default defineConfig({
         target: process.env.API_PROXY_TARGET || 'http://localhost:5000',
         changeOrigin: true,
       },
+      '/health': {
+        target: process.env.API_PROXY_TARGET || 'http://localhost:5000',
+        changeOrigin: true,
+      },
     },
   },
 })

@@ -23,18 +23,6 @@ export default function CharactersPage() {
     fetchCharacters()
   }, [])
 
-  const handleTogglePublic = async (id: string, isPublic: boolean) => {
-    try {
-      await api(`/api/characters/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ isPublic }),
-      })
-      fetchCharacters()
-    } catch (err) {
-      if (err instanceof ApiError) setError(err.message)
-    }
-  }
-
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this character?')) return
     try {
@@ -69,7 +57,6 @@ export default function CharactersPage() {
             <CharacterCard
               key={c.id}
               character={c}
-              onTogglePublic={handleTogglePublic}
               onDelete={handleDelete}
             />
           ))}
