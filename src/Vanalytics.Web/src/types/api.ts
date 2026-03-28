@@ -26,6 +26,7 @@ export interface UserProfile {
   apiKeyCreatedAt: string | null
   role: UserRole
   oAuthProvider: string | null
+  defaultServer: string | null
   createdAt: string
 }
 

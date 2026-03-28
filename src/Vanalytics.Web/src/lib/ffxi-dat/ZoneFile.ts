@@ -117,8 +117,11 @@ export function parseZoneFile(
   if (duplicateNames.length > 0) {
     console.warn(`[ZoneFile] ${duplicateNames.length} duplicate texture names (last wins):`, duplicateNames)
   }
-  // Log first 10 textures with dimensions to help identify what texture[0] is
-  console.log('[ZoneFile] First textures:', textures.slice(0, 10).map((t, i) => `[${i}] ${t.width}×${t.height}`))
+  // Log first 10 textures with dimensions and first pixel to verify data integrity
+  console.log('[ZoneFile] First textures:', textures.slice(0, 10).map((t, i) => {
+    const r = t.rgba[0], g = t.rgba[1], b = t.rgba[2], a = t.rgba[3]
+    return `[${i}] ${t.width}×${t.height} px0=(${r},${g},${b},${a})`
+  }))
 
   // Merge supplemental textures from companion DATs (only add names not already present)
   if (supplementalTextures) {
@@ -162,12 +165,11 @@ export function parseZoneFile(
 
       const meshes = parseMmbBlock(decryptedData)
 
-      // Resolve texture names to material indices.
-      // Blank texture names (16 ASCII spaces → empty after trim) mean "use zone
-      // default texture" — FFXI stores the primary terrain texture at index 0.
+      // Resolve texture names to material indices
       for (const mesh of meshes) {
         if (!mesh.textureName) {
-          mesh.materialIndex = textures.length > 0 ? 0 : -1
+          // Blank texture name — resolved after all MMB blocks are parsed
+          mesh.materialIndex = -1
           continue
         }
         const texIdx = textureNameMap.get(mesh.textureName)
@@ -191,6 +193,26 @@ export function parseZoneFile(
       }
     } catch { /* skip */ }
   }
+  // Assign fallback texture to blank-name meshes using the zone's most-used texture.
+  // These meshes have 16 ASCII spaces as their texture name (blank), meaning they
+  // should use the zone's primary terrain texture. We find it by usage frequency.
+  const texUsage = new Map<number, number>()
+  for (const p of prefabs) {
+    if (p.materialIndex >= 0) texUsage.set(p.materialIndex, (texUsage.get(p.materialIndex) || 0) + 1)
+  }
+  let fallbackTexIdx = -1
+  let fallbackMax = 0
+  for (const [idx, count] of texUsage) {
+    if (count > fallbackMax) { fallbackMax = count; fallbackTexIdx = idx }
+  }
+  if (fallbackTexIdx >= 0) {
+    let count = 0
+    for (const p of prefabs) {
+      if (p.materialIndex === -1) { p.materialIndex = fallbackTexIdx; count++ }
+    }
+    if (count > 0) console.log(`[ZoneFile] ${count} untextured meshes → fallback texture[${fallbackTexIdx}]`)
+  }
+
   onProgress?.(`MMB: ${prefabs.length} meshes from ${mmbBlocks.length} blocks, ${mmbNameMap.size} unique names`)
 
   // ── Pass 3: MZB transforms (with name-based lookup) ──
