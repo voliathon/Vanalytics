@@ -682,5 +682,5 @@ export interface ZoneSpawnDto {
   rotation: number
   minLevel: number
   maxLevel: number
-  isMonster: boolean
+  isMonster: boolean | null
 }
