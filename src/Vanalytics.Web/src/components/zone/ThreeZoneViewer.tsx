@@ -71,9 +71,12 @@ function getTimeOfDayParams(hour: number) {
   }
 }
 
-/** Patches a zone material's shader to include height-based fog attenuation.
- *  Fog is thickest below fogHeightBase and fades out over fogHeightRange. */
-function patchHeightFog(
+/** Patches a zone material's shader with:
+ *  1. Height-based fog attenuation (thickest below fogHeightBase, fades over fogHeightRange)
+ *  2. Dark-transparent discard: discards pixels that are BOTH nearly transparent AND nearly black.
+ *     This removes black backgrounds from foliage/plant sprites without creating holes in ground
+ *     textures (which have colored RGB even at low alpha). */
+function patchZoneShader(
   material: THREE.Material,
   uniforms: { fogHeightBase: { value: number }; fogHeightRange: { value: number } }
 ) {
@@ -103,6 +106,13 @@ function patchHeightFog(
       uniform float fogHeightBase;
       uniform float fogHeightRange;`
     )
+    // Force fully opaque output — DXT3 alpha values would otherwise cause
+    // semi-transparency artifacts on ground/wall tiles
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <premultiplied_alpha_fragment>',
+      `#include <premultiplied_alpha_fragment>
+      gl_FragColor.a = 1.0;`
+    )
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <fog_fragment>',
       `#ifdef USE_FOG
@@ -111,14 +121,13 @@ function patchHeightFog(
         #else
           float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
         #endif
-        // Height attenuation: thickest below fogHeightBase, fades over fogHeightRange
         float heightAtten = 1.0 - smoothstep(fogHeightBase, fogHeightBase + fogHeightRange, vWorldY);
         fogFactor *= max(heightAtten, 0.06);
         gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, clamp(fogFactor, 0.0, 1.0));
       #endif`
     )
   }
-  material.customProgramCacheKey = () => 'height-fog'
+  material.customProgramCacheKey = () => 'zone-shader'
 }
 
 /** Texture name patterns that indicate water surfaces */
@@ -127,6 +136,7 @@ const WATER_NAME_RE = /water|sea|umi|wtr|river|wave|pool|lake|aqua|suimen|suime|
 function isWaterMesh(prefab: { textureName?: string; blending: number }): boolean {
   return WATER_NAME_RE.test(prefab.textureName ?? '')
 }
+
 
 const WATER_VERT = /* glsl */ `
   attribute vec3 color;
@@ -449,7 +459,10 @@ export default function ThreeZoneViewer({ zoneData, fogDensity = 0, timeOfDay = 
         waterMaterials.push(waterMat)
         materials.push(waterMat)
       } else {
-        // Unlit material — FFXI bakes all lighting into vertex colors
+        // Unlit material — FFXI bakes all lighting into vertex colors.
+        // blending>0 meshes use alphaTest for cutout (trees, foliage with flag set).
+        // The shader also discards black+transparent pixels universally (patchZoneShader)
+        // to catch foliage with blending=0.
         const useAlpha = prefab.blending > 0
         const mat = new THREE.MeshBasicMaterial({
           ...(texture && { map: texture }),
@@ -457,7 +470,7 @@ export default function ThreeZoneViewer({ zoneData, fogDensity = 0, timeOfDay = 
           side: THREE.DoubleSide,
           ...(useAlpha && { alphaTest: 0.1 }),
         })
-        patchHeightFog(mat, fogUniforms.current)
+        patchZoneShader(mat, fogUniforms.current)
         materials.push(mat)
       }
     }
