@@ -296,6 +296,8 @@ function SkyAnimator({ skyMaterial, timeOfDayRef }: { skyMaterial: THREE.ShaderM
 }
 
 export default function ThreeZoneViewer({ zoneData, fogDensity = 0, timeOfDay = 12, cameraMode = 'orbit', onFlySpeedChange, spawns, showSpawns, showSkybeams, onSpawnHover, flyToTarget, debugVertexColors = false }: ThreeZoneViewerProps) {
+  const hoveringSpawn = useRef(false)
+
   // Shared uniform refs for height fog — values updated once bounding box is known
   const fogUniforms = useRef({
     fogHeightBase: { value: 0 },
@@ -639,7 +641,7 @@ export default function ThreeZoneViewer({ zoneData, fogDensity = 0, timeOfDay = 
       {cameraMode === 'orbit' ? (
         <SmartOrbitControls defaultTarget={center} size={size} />
       ) : (
-        <FlyCamera center={center} size={size} onSpeedChange={onFlySpeedChange} />
+        <FlyCamera center={center} size={size} onSpeedChange={onFlySpeedChange} hoveringSpawnRef={hoveringSpawn} />
       )}
 
       <CameraFlyTo target={flyToTarget ?? null} />
@@ -650,7 +652,10 @@ export default function ThreeZoneViewer({ zoneData, fogDensity = 0, timeOfDay = 
         {instancedMeshes.map((mesh, i) => (
           <primitive key={i} object={mesh} />
         ))}
-        <SpawnMarkers spawns={spawns ?? []} visible={showSpawns ?? false} onHover={onSpawnHover} />
+        <SpawnMarkers spawns={spawns ?? []} visible={showSpawns ?? false} onHover={(spawn, pos) => {
+          hoveringSpawn.current = spawn !== null
+          onSpawnHover?.(spawn, pos)
+        }} />
         {showSkybeams && spawns && spawns.length > 0 && (
           <SpawnSkybeams spawns={spawns} />
         )}
@@ -748,6 +753,8 @@ function CameraFlyTo({ target }: { target: { x: number; y: number; z: number } |
 
   useEffect(() => {
     if (!target) return
+    // Exit pointer lock so the fly camera doesn't fight with the animation
+    if (document.pointerLockElement) document.exitPointerLock()
     // The scene group has rotation=[Math.PI, 0, 0] which inverts both Y and Z.
     // Convert spawn local coords to world space for the camera.
     const worldTarget = new THREE.Vector3(target.x, -target.y, -target.z)
@@ -776,7 +783,7 @@ function CameraFlyTo({ target }: { target: { x: number; y: number; z: number } |
   return null
 }
 
-function FlyCamera({ center, size, onSpeedChange }: { center: THREE.Vector3; size: number; onSpeedChange?: (speed: number) => void }) {
+function FlyCamera({ center, size, onSpeedChange, hoveringSpawnRef }: { center: THREE.Vector3; size: number; onSpeedChange?: (speed: number) => void; hoveringSpawnRef: React.RefObject<boolean> }) {
   const { camera, gl } = useThree()
   const moveState = useRef({ forward: false, backward: false, left: false, right: false, up: false, down: false })
   const speed = useRef(size * 0.003)
@@ -813,6 +820,7 @@ function FlyCamera({ center, size, onSpeedChange }: { center: THREE.Vector3; siz
       onSpeedChange?.(speed.current)
     }
     const onClick = () => {
+      if (hoveringSpawnRef.current) return
       gl.domElement.requestPointerLock()
     }
     const onPointerLockChange = () => {

@@ -264,7 +264,7 @@ export default function ZoneBrowserPage() {
     // Fixed positioning: fills viewport to the right of the sidebar
     <div className="fixed inset-0 lg:left-64 z-10 bg-gray-950 overflow-hidden">
       {/* ── 3D Viewport (fills entire area) ── */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0" onPointerDown={() => setHoveredSpawn(null)}>
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-950/80 z-20">
             <p className="text-sm text-gray-400 animate-pulse">Loading zone...</p>
@@ -473,6 +473,8 @@ export default function ZoneBrowserPage() {
             spawns={spawns}
             onSelectSpawn={(spawn) => {
               setFlyToTarget({ x: spawn.x, y: spawn.y, z: spawn.z })
+              setHoveredSpawn(spawn)
+              setHoverPos({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
             }}
           />
         )}

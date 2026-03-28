@@ -163,12 +163,11 @@ export function parseZoneFile(
       const meshes = parseMmbBlock(decryptedData)
 
       // Resolve texture names to material indices.
-      // When a mesh references a texture not in this zone's IMG blocks (common for
-      // sub-area geometry like Divine Guardian islands in Ru'Aun Gardens, whose
-      // textures live in a shared DAT), fall back to the most-used terrain texture.
+      // Blank texture names (16 ASCII spaces → empty after trim) mean "use zone
+      // default texture" — FFXI stores the primary terrain texture at index 0.
       for (const mesh of meshes) {
         if (!mesh.textureName) {
-          mesh.materialIndex = -1
+          mesh.materialIndex = textures.length > 0 ? 0 : -1
           continue
         }
         const texIdx = textureNameMap.get(mesh.textureName)
