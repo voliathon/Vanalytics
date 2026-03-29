@@ -108,6 +108,13 @@ public class AuthController : ControllerBase
         var user = await _db.Users.FirstOrDefaultAsync(u =>
             u.OAuthProvider == userInfo.Provider && u.OAuthId == userInfo.ProviderId);
 
+        if (user is not null && userInfo.AvatarUrl is not null)
+        {
+            user.AvatarUrl = userInfo.AvatarUrl;
+            user.UpdatedAt = DateTimeOffset.UtcNow;
+            await _db.SaveChangesAsync();
+        }
+
         if (user is null)
         {
             user = await _db.Users.FirstOrDefaultAsync(u => u.Email == userInfo.Email);
@@ -115,6 +122,7 @@ public class AuthController : ControllerBase
             {
                 user.OAuthProvider = userInfo.Provider;
                 user.OAuthId = userInfo.ProviderId;
+                user.AvatarUrl = userInfo.AvatarUrl;
                 user.UpdatedAt = DateTimeOffset.UtcNow;
             }
             else
@@ -128,6 +136,7 @@ public class AuthController : ControllerBase
                     Id = Guid.NewGuid(),
                     Email = userInfo.Email,
                     Username = username,
+                    AvatarUrl = userInfo.AvatarUrl,
                     OAuthProvider = userInfo.Provider,
                     OAuthId = userInfo.ProviderId,
                     CreatedAt = DateTimeOffset.UtcNow,
@@ -181,6 +190,7 @@ public class AuthController : ControllerBase
             HasApiKey = user.ApiKey is not null,
             ApiKeyCreatedAt = user.ApiKeyCreatedAt,
             Role = user.Role.ToString(),
+            AvatarUrl = user.AvatarUrl,
             OAuthProvider = user.OAuthProvider,
             DefaultServer = user.DefaultServer,
             CreatedAt = user.CreatedAt
