@@ -54,11 +54,29 @@ public class CharactersControllerTests : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
-    private async Task<string> RegisterAndGetTokenAsync(string email, string username)
+    private async Task<string> CreateUserAndGetTokenAsync(string email, string username, string password = "Password123!")
     {
-        var resp = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        { Email = email, Username = username, Password = "Password123!" });
-        var auth = await resp.Content.ReadFromJsonAsync<AuthResponse>();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
+
+        var user = new Soverance.Auth.Models.User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            Username = username,
+            PasswordHash = Soverance.Auth.Services.PasswordHasher.HashPassword(password),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = email,
+            Password = password
+        });
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
         return auth!.AccessToken;
     }
 
@@ -72,7 +90,7 @@ public class CharactersControllerTests : IAsyncLifetime
     private async Task<(string Token, Guid CharacterId)> SetupUserWithCharacterAsync(
         string email, string username, string charName)
     {
-        var token = await RegisterAndGetTokenAsync(email, username);
+        var token = await CreateUserAndGetTokenAsync(email, username);
 
         // Generate API key
         var keyReq = Authed(HttpMethod.Post, "/api/keys/generate", token);
@@ -129,7 +147,7 @@ public class CharactersControllerTests : IAsyncLifetime
     public async Task GetCharacter_NonOwnerGetsForbidden()
     {
         var (_, charId) = await SetupUserWithCharacterAsync("char5a@test.com", "char5auser", "OtherChar");
-        var token2 = await RegisterAndGetTokenAsync("char5b@test.com", "char5buser");
+        var token2 = await CreateUserAndGetTokenAsync("char5b@test.com", "char5buser");
 
         var resp = await _client.SendAsync(Authed(HttpMethod.Get, $"/api/characters/{charId}", token2));
 

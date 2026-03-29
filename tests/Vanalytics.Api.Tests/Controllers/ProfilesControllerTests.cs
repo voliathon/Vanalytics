@@ -54,21 +54,45 @@ public class ProfilesControllerTests : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
+    private async Task<string> CreateUserAndGetTokenAsync(string email, string username, string password = "Password123!")
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
+
+        var user = new Soverance.Auth.Models.User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            Username = username,
+            PasswordHash = Soverance.Auth.Services.PasswordHasher.HashPassword(password),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = email,
+            Password = password
+        });
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        return auth!.AccessToken;
+    }
+
     /// <summary>
-    /// Registers a user, syncs a character (auto-creating it), then optionally makes it public.
+    /// Creates a user directly in the DB, syncs a character (auto-creating it), then makes it public.
     /// Returns the JWT token and the created character summary.
     /// </summary>
     private async Task<(string Token, CharacterSummaryResponse Character)> CreatePublicCharacterAsync(
         string email, string username, string charName, string server)
     {
-        // Register user
-        var regResp = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        { Email = email, Username = username, Password = "Password123!" });
-        var auth = (await regResp.Content.ReadFromJsonAsync<AuthResponse>())!;
+        // Create user directly in DB and login
+        var accessToken = await CreateUserAndGetTokenAsync(email, username);
 
         // Generate API key
         var keyReq = new HttpRequestMessage(HttpMethod.Post, "/api/keys/generate");
-        keyReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        keyReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         var keyResp = await _client.SendAsync(keyReq);
         var apiKey = (await keyResp.Content.ReadFromJsonAsync<ApiKeyResponse>())!;
 
@@ -87,18 +111,18 @@ public class ProfilesControllerTests : IAsyncLifetime
 
         // Get character
         var listReq = new HttpRequestMessage(HttpMethod.Get, "/api/characters");
-        listReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        listReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         var listResp = await _client.SendAsync(listReq);
         var chars = (await listResp.Content.ReadFromJsonAsync<List<CharacterSummaryResponse>>())!;
         var character = chars.First(c => c.Name == charName);
 
         // Make it public
         var updateReq = new HttpRequestMessage(HttpMethod.Put, $"/api/characters/{character.Id}");
-        updateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        updateReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         updateReq.Content = JsonContent.Create(new UpdateCharacterRequest { IsPublic = true });
         await _client.SendAsync(updateReq);
 
-        return (auth.AccessToken, character);
+        return (accessToken, character);
     }
 
     [Fact]
@@ -117,14 +141,12 @@ public class ProfilesControllerTests : IAsyncLifetime
     [Fact]
     public async Task GetPublicProfile_WhenPrivate_ReturnsNotFound()
     {
-        // Register user
-        var regResp = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        { Email = "prof2@test.com", Username = "prof2user", Password = "Password123!" });
-        var auth = (await regResp.Content.ReadFromJsonAsync<AuthResponse>())!;
+        // Create user directly in DB and login
+        var accessToken = await CreateUserAndGetTokenAsync("prof2@test.com", "prof2user");
 
         // Generate API key
         var keyReq = new HttpRequestMessage(HttpMethod.Post, "/api/keys/generate");
-        keyReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);
+        keyReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
         var keyResp = await _client.SendAsync(keyReq);
         var apiKey = (await keyResp.Content.ReadFromJsonAsync<ApiKeyResponse>())!;
 

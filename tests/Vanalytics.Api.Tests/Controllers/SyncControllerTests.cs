@@ -57,10 +57,25 @@ public class SyncControllerTests : IAsyncLifetime
     private async Task<(string JwtToken, string ApiKey)> SetupSyncUserAsync(
         string email, string username)
     {
-        // Register user
-        var regResp = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        { Email = email, Username = username, Password = "Password123!" });
-        var auth = (await regResp.Content.ReadFromJsonAsync<AuthResponse>())!;
+        // Create user directly in DB and login
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
+
+        var user = new Soverance.Auth.Models.User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            Username = username,
+            PasswordHash = Soverance.Auth.Services.PasswordHasher.HashPassword("Password123!"),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var loginResp = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        { Email = email, Password = "Password123!" });
+        var auth = (await loginResp.Content.ReadFromJsonAsync<AuthResponse>())!;
 
         // Generate API key
         var keyReq = new HttpRequestMessage(HttpMethod.Post, "/api/keys/generate");
