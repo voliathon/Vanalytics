@@ -46,7 +46,8 @@ public class OAuthService
             Provider = "google",
             ProviderId = googleUser!.Id,
             Email = googleUser.Email,
-            Name = googleUser.Name ?? googleUser.Email.Split('@')[0]
+            Name = googleUser.Name ?? googleUser.Email.Split('@')[0],
+            AvatarUrl = googleUser.Picture
         };
     }
 
@@ -94,6 +95,7 @@ public class OAuthUserInfo
     public string ProviderId { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? AvatarUrl { get; set; }
 }
 
 public class OAuthTokenResponse
@@ -112,6 +114,9 @@ public class GoogleUserInfo
 
     [JsonPropertyName("name")]
     public string? Name { get; set; }
+
+    [JsonPropertyName("picture")]
+    public string? Picture { get; set; }
 }
 
 public class MicrosoftUserInfo
