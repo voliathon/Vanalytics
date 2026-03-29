@@ -90,6 +90,7 @@ export interface CharacterDetail {
   resWater?: number
   resLight?: number
   resDark?: number
+  playtimeSeconds?: number
   merits?: Record<string, number>
   jobs: JobEntry[]
   gear: GearEntry[]

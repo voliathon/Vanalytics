@@ -130,6 +130,7 @@ public class SyncController : ControllerBase
         character.ResWater = request.ResWater;
         character.ResLight = request.ResLight;
         character.ResDark = request.ResDark;
+        character.PlaytimeSeconds = request.PlaytimeSeconds;
         character.MeritsJson = request.Merits is { Count: > 0 }
             ? JsonSerializer.Serialize(request.Merits)
             : null;

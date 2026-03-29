@@ -56,6 +56,8 @@ public class CharacterDetailResponse
     public int? ResLight { get; set; }
     public int? ResDark { get; set; }
 
+    public int? PlaytimeSeconds { get; set; }
+
     public Dictionary<string, int>? Merits { get; set; }
     public FavoriteAnimationDto? FavoriteAnimation { get; set; }
 

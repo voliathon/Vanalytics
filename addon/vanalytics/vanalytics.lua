@@ -31,6 +31,7 @@ local sync_timer = nil
 local MIN_INTERVAL = 5
 local current_title_id = 0
 local packet_stats = nil  -- populated from incoming packet 0x061
+local playtime_seconds = nil  -- populated from incoming packet 0x00A
 
 -----------------------------------------------------------------------
 -- Utility: chat log output
@@ -775,6 +776,11 @@ local function read_character_state()
         end
     end
 
+    -- Playtime from packet 0x00A
+    if playtime_seconds and playtime_seconds > 0 then
+        state.playtimeSeconds = playtime_seconds
+    end
+
     return state
 end
 
@@ -1015,6 +1021,9 @@ windower.register_event('incoming chunk', function(id, data)
             resLightning = resLightning, resWater = resWater, resLight = resLight, resDark = resDark,
             nationRank = nationRank, rankPoints = rankPoints,
         }
+    elseif id == 0x00A then
+        -- Playtime in seconds (uint32 at offset 0xA0)
+        playtime_seconds = data:unpack('I', 0xA0 + 1) or 0
     end
 end)
 

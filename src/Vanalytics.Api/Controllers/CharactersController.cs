@@ -279,6 +279,7 @@ public class CharactersController : ControllerBase
         ResWater = c.ResWater,
         ResLight = c.ResLight,
         ResDark = c.ResDark,
+        PlaytimeSeconds = c.PlaytimeSeconds,
         Merits = c.MeritsJson != null
             ? JsonSerializer.Deserialize<Dictionary<string, int>>(c.MeritsJson)
             : null,

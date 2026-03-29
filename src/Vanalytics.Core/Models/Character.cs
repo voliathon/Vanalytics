@@ -59,6 +59,9 @@ public class Character
     public int? ResLight { get; set; }
     public int? ResDark { get; set; }
 
+    // Playtime in seconds (from packet 0x00A)
+    public int? PlaytimeSeconds { get; set; }
+
     public string? MeritsJson { get; set; }
     public string? FavoriteAnimationJson { get; set; }
     public DateTimeOffset? LastSyncAt { get; set; }

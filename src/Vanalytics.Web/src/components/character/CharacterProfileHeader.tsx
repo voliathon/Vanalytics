@@ -2,6 +2,15 @@ import type { CharacterDetail } from '../../types/api'
 
 const NATION_NAMES: Record<number, string> = { 0: "San d'Oria", 1: 'Bastok', 2: 'Windurst' }
 
+function formatPlaytime(seconds: number): string {
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (days > 0) return `${days}d ${hours}h ${minutes}m`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+}
+
 interface CharacterProfileHeaderProps {
   character: CharacterDetail
   showPublicButton?: boolean
@@ -40,6 +49,9 @@ export default function CharacterProfileHeader({
   // Row 3: Meta
   const metaParts = [
     character.lastSyncAt ? `Last sync: ${new Date(character.lastSyncAt).toLocaleString()}` : null,
+    character.playtimeSeconds != null && character.playtimeSeconds > 0
+      ? `Playtime: ${formatPlaytime(character.playtimeSeconds)}`
+      : null,
   ].filter(Boolean)
 
   return (

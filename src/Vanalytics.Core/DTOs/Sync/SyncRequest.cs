@@ -65,6 +65,8 @@ public class SyncRequest
     public int? ResLight { get; set; }
     public int? ResDark { get; set; }
 
+    public int? PlaytimeSeconds { get; set; }
+
     public Dictionary<string, int>? Merits { get; set; }
     public List<SyncModelEntry> Models { get; set; } = [];
 
