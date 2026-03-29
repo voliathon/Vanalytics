@@ -65,11 +65,29 @@ public class ForumControllerTests : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
-    private async Task<string> RegisterAndGetTokenAsync(string email, string username)
+    private async Task<string> CreateUserAndGetTokenAsync(string email, string username, string password = "Password123!")
     {
-        var resp = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        { Email = email, Username = username, Password = "Password123!" });
-        var auth = await resp.Content.ReadFromJsonAsync<AuthResponse>();
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
+
+        var user = new Soverance.Auth.Models.User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            Username = username,
+            PasswordHash = Soverance.Auth.Services.PasswordHasher.HashPassword(password),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = email,
+            Password = password
+        });
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
         return auth!.AccessToken;
     }
 
@@ -93,7 +111,7 @@ public class ForumControllerTests : IAsyncLifetime
 
     private async Task<string> GetModeratorTokenAsync(string email, string username)
     {
-        await RegisterAndGetTokenAsync(email, username);
+        await CreateUserAndGetTokenAsync(email, username);
         await PromoteToModeratorAsync(email);
 
         // Re-login to get a token with the updated Moderator role claim
@@ -133,7 +151,7 @@ public class ForumControllerTests : IAsyncLifetime
     [Fact]
     public async Task CreateCategory_MemberRole_Returns403()
     {
-        var token = await RegisterAndGetTokenAsync("member1@test.com", "member1");
+        var token = await CreateUserAndGetTokenAsync("member1@test.com", "member1");
 
         var resp = await _client.SendAsync(Authed(HttpMethod.Post, "/api/forum/categories", token,
             new CreateCategoryRequest("Test Category", "A description")));
@@ -163,7 +181,7 @@ public class ForumControllerTests : IAsyncLifetime
         var cat = await catResp.Content.ReadFromJsonAsync<JsonElement>();
         var slug = cat.GetProperty("slug").GetString()!;
 
-        var memberToken = await RegisterAndGetTokenAsync("member2@test.com", "member2");
+        var memberToken = await CreateUserAndGetTokenAsync("member2@test.com", "member2");
 
         var resp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/categories/{slug}/threads", memberToken,
             new CreateThreadRequest("My First Thread", "Thread body content here.")));
@@ -182,7 +200,7 @@ public class ForumControllerTests : IAsyncLifetime
         var cat = await catResp.Content.ReadFromJsonAsync<JsonElement>();
         var catSlug = cat.GetProperty("slug").GetString()!;
 
-        var memberToken = await RegisterAndGetTokenAsync("member3@test.com", "member3");
+        var memberToken = await CreateUserAndGetTokenAsync("member3@test.com", "member3");
         var threadResp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/categories/{catSlug}/threads", memberToken,
             new CreateThreadRequest("Enriched Posts Thread", "Opening post body.")));
         var thread = await threadResp.Content.ReadFromJsonAsync<JsonElement>();
@@ -208,7 +226,7 @@ public class ForumControllerTests : IAsyncLifetime
         var cat = await catResp.Content.ReadFromJsonAsync<JsonElement>();
         var catSlug = cat.GetProperty("slug").GetString()!;
 
-        var memberToken = await RegisterAndGetTokenAsync("member4@test.com", "member4");
+        var memberToken = await CreateUserAndGetTokenAsync("member4@test.com", "member4");
         var threadResp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/categories/{catSlug}/threads", memberToken,
             new CreateThreadRequest("Thread to Lock", "This will be locked.")));
         var thread = await threadResp.Content.ReadFromJsonAsync<JsonElement>();
@@ -234,7 +252,7 @@ public class ForumControllerTests : IAsyncLifetime
         var cat = await catResp.Content.ReadFromJsonAsync<JsonElement>();
         var catSlug = cat.GetProperty("slug").GetString()!;
 
-        var memberToken = await RegisterAndGetTokenAsync("member5@test.com", "member5");
+        var memberToken = await CreateUserAndGetTokenAsync("member5@test.com", "member5");
         var threadResp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/categories/{catSlug}/threads", memberToken,
             new CreateThreadRequest("Vote Thread", "Vote thread body.")));
         var thread = await threadResp.Content.ReadFromJsonAsync<JsonElement>();
@@ -269,7 +287,7 @@ public class ForumControllerTests : IAsyncLifetime
         var cat = await catResp.Content.ReadFromJsonAsync<JsonElement>();
         var catSlug = cat.GetProperty("slug").GetString()!;
 
-        var memberToken = await RegisterAndGetTokenAsync("member6@test.com", "member6");
+        var memberToken = await CreateUserAndGetTokenAsync("member6@test.com", "member6");
 
         var resp = await _client.SendAsync(Authed(HttpMethod.Post, $"/api/forum/categories/{catSlug}/threads", memberToken,
             new CreateThreadRequest("", "Body content here.")));
@@ -310,7 +328,7 @@ public class ForumControllerTests : IAsyncLifetime
             Authed(HttpMethod.Post, "/api/forum/categories", modToken,
                 new CreateCategoryRequest("SearchCat", "")));
 
-        var memberToken = await RegisterAndGetTokenAsync("searchmem1@test.com", "searchmem1");
+        var memberToken = await CreateUserAndGetTokenAsync("searchmem1@test.com", "searchmem1");
         await _client.SendAsync(
             Authed(HttpMethod.Post, "/api/forum/categories/searchcat/threads", memberToken,
                 new CreateThreadRequest("UniqueSearchableTitle", "Some body content")));
@@ -331,7 +349,7 @@ public class ForumControllerTests : IAsyncLifetime
             Authed(HttpMethod.Post, "/api/forum/categories", modToken,
                 new CreateCategoryRequest("SearchCat2", "")));
 
-        var memberToken = await RegisterAndGetTokenAsync("searchmem2@test.com", "searchmem2");
+        var memberToken = await CreateUserAndGetTokenAsync("searchmem2@test.com", "searchmem2");
         await _client.SendAsync(
             Authed(HttpMethod.Post, "/api/forum/categories/searchcat2/threads", memberToken,
                 new CreateThreadRequest("Normal Title", "VeryUniqueBodyContent12345")));
@@ -385,7 +403,7 @@ public class ForumControllerTests : IAsyncLifetime
     [Fact]
     public async Task UploadAttachment_NoFile_Returns400()
     {
-        var token = await RegisterAndGetTokenAsync("uploader@test.com", "uploader");
+        var token = await CreateUserAndGetTokenAsync("uploader@test.com", "uploader");
         var req = new HttpRequestMessage(HttpMethod.Post, "/api/forum/attachments");
         req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         req.Content = new MultipartFormDataContent();
@@ -398,7 +416,7 @@ public class ForumControllerTests : IAsyncLifetime
     [Fact]
     public async Task UploadAttachment_TooLarge_Returns400()
     {
-        var token = await RegisterAndGetTokenAsync("uploader2@test.com", "uploader2");
+        var token = await CreateUserAndGetTokenAsync("uploader2@test.com", "uploader2");
         var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(new byte[6 * 1024 * 1024]); // 6MB
         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
@@ -416,7 +434,7 @@ public class ForumControllerTests : IAsyncLifetime
     [Fact]
     public async Task UploadAttachment_InvalidType_Returns400()
     {
-        var token = await RegisterAndGetTokenAsync("uploader3@test.com", "uploader3");
+        var token = await CreateUserAndGetTokenAsync("uploader3@test.com", "uploader3");
         var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(new byte[] { 1, 2, 3 });
         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/pdf");
@@ -434,7 +452,7 @@ public class ForumControllerTests : IAsyncLifetime
     [Fact]
     public async Task UploadAttachment_ValidImage_ReturnsIdAndUrl()
     {
-        var token = await RegisterAndGetTokenAsync("uploader4@test.com", "uploader4");
+        var token = await CreateUserAndGetTokenAsync("uploader4@test.com", "uploader4");
         var content = new MultipartFormDataContent();
         var fileContent = new ByteArrayContent(new byte[] { 137, 80, 78, 71 }); // PNG magic bytes
         fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");

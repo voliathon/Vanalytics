@@ -57,13 +57,27 @@ public class KeysControllerTests : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
-    private async Task<string> RegisterAndGetTokenAsync(string email, string username)
+    private async Task<string> CreateUserAndGetTokenAsync(string email, string username, string password = "Password123!")
     {
-        var response = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
+
+        var user = new Soverance.Auth.Models.User
         {
+            Id = Guid.NewGuid(),
             Email = email,
             Username = username,
-            Password = "Password123!"
+            PasswordHash = Soverance.Auth.Services.PasswordHasher.HashPassword(password),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = email,
+            Password = password
         });
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
         return auth!.AccessToken;
@@ -79,7 +93,7 @@ public class KeysControllerTests : IAsyncLifetime
     [Fact]
     public async Task Generate_WithAuth_ReturnsApiKey()
     {
-        var token = await RegisterAndGetTokenAsync("keygen@example.com", "keygen");
+        var token = await CreateUserAndGetTokenAsync("keygen@example.com", "keygen");
 
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Post, "/api/keys/generate", token));
 
@@ -100,7 +114,7 @@ public class KeysControllerTests : IAsyncLifetime
     [Fact]
     public async Task Generate_Twice_InvalidatesOldKey()
     {
-        var token = await RegisterAndGetTokenAsync("keygen2@example.com", "keygen2");
+        var token = await CreateUserAndGetTokenAsync("keygen2@example.com", "keygen2");
 
         var response1 = await _client.SendAsync(AuthedRequest(HttpMethod.Post, "/api/keys/generate", token));
         var key1 = (await response1.Content.ReadFromJsonAsync<ApiKeyResponse>())!.ApiKey;
@@ -114,7 +128,7 @@ public class KeysControllerTests : IAsyncLifetime
     [Fact]
     public async Task Generate_Twice_UpdatesTimestamp()
     {
-        var token = await RegisterAndGetTokenAsync("keygen3@example.com", "keygen3");
+        var token = await CreateUserAndGetTokenAsync("keygen3@example.com", "keygen3");
 
         var response1 = await _client.SendAsync(AuthedRequest(HttpMethod.Post, "/api/keys/generate", token));
         var key1 = (await response1.Content.ReadFromJsonAsync<ApiKeyResponse>())!;
@@ -131,7 +145,7 @@ public class KeysControllerTests : IAsyncLifetime
     [Fact]
     public async Task Revoke_WithAuth_RemovesApiKey()
     {
-        var token = await RegisterAndGetTokenAsync("revoke@example.com", "revoke");
+        var token = await CreateUserAndGetTokenAsync("revoke@example.com", "revoke");
 
         await _client.SendAsync(AuthedRequest(HttpMethod.Post, "/api/keys/generate", token));
         var response = await _client.SendAsync(AuthedRequest(HttpMethod.Delete, "/api/keys", token));

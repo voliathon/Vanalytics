@@ -83,9 +83,24 @@ public class EconomyControllerTests : IAsyncLifetime
 
     private async Task<string> GetApiKeyAsync()
     {
-        var regResp = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        { Email = "econ@test.com", Username = "econuser", Password = "Password123!" });
-        var auth = (await regResp.Content.ReadFromJsonAsync<AuthResponse>())!;
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
+
+        var user = new Soverance.Auth.Models.User
+        {
+            Id = Guid.NewGuid(),
+            Email = "econ@test.com",
+            Username = "econuser",
+            PasswordHash = Soverance.Auth.Services.PasswordHasher.HashPassword("Password123!"),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var loginResp = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        { Email = "econ@test.com", Password = "Password123!" });
+        var auth = (await loginResp.Content.ReadFromJsonAsync<AuthResponse>())!;
 
         var keyReq = new HttpRequestMessage(HttpMethod.Post, "/api/keys/generate");
         keyReq.Headers.Authorization = new AuthenticationHeaderValue("Bearer", auth.AccessToken);

@@ -55,52 +55,61 @@ public class AuthControllerTests : IAsyncLifetime
         await _container.DisposeAsync();
     }
 
-    [Fact]
-    public async Task Register_WithValidData_ReturnsTokens()
+    private async Task<string> CreateUserAndGetTokenAsync(string email, string username, string password = "Password123!")
     {
-        var response = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        {
-            Email = "new@example.com",
-            Username = "newuser",
-            Password = "Password123!"
-        });
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var user = new Soverance.Auth.Models.User
+        {
+            Id = Guid.NewGuid(),
+            Email = email,
+            Username = username,
+            PasswordHash = Soverance.Auth.Services.PasswordHasher.HashPassword(password),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = email,
+            Password = password
+        });
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
-        Assert.NotNull(auth);
-        Assert.NotEmpty(auth.AccessToken);
-        Assert.NotEmpty(auth.RefreshToken);
+        return auth!.AccessToken;
     }
 
-    [Fact]
-    public async Task Register_WithDuplicateEmail_ReturnsConflict()
+    private async Task<AuthResponse> CreateUserAndGetAuthAsync(string email, string username, string password = "Password123!")
     {
-        await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        {
-            Email = "dupe@example.com",
-            Username = "user1",
-            Password = "Password123!"
-        });
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VanalyticsDbContext>();
 
-        var response = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
+        var user = new Soverance.Auth.Models.User
         {
-            Email = "dupe@example.com",
-            Username = "user2",
-            Password = "Password123!"
-        });
+            Id = Guid.NewGuid(),
+            Email = email,
+            Username = username,
+            PasswordHash = Soverance.Auth.Services.PasswordHasher.HashPassword(password),
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
 
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = email,
+            Password = password
+        });
+        return (await response.Content.ReadFromJsonAsync<AuthResponse>())!;
     }
 
     [Fact]
     public async Task Login_WithValidCredentials_ReturnsTokens()
     {
-        await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        {
-            Email = "login@example.com",
-            Username = "loginuser",
-            Password = "Password123!"
-        });
+        await CreateUserAndGetTokenAsync("login@example.com", "loginuser");
 
         var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
         {
@@ -117,12 +126,7 @@ public class AuthControllerTests : IAsyncLifetime
     [Fact]
     public async Task Login_WithWrongPassword_ReturnsUnauthorized()
     {
-        await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        {
-            Email = "wrong@example.com",
-            Username = "wronguser",
-            Password = "Password123!"
-        });
+        await CreateUserAndGetTokenAsync("wrong@example.com", "wronguser");
 
         var response = await _client.PostAsJsonAsync("/api/auth/login", new LoginRequest
         {
@@ -136,17 +140,11 @@ public class AuthControllerTests : IAsyncLifetime
     [Fact]
     public async Task Me_WithValidToken_ReturnsProfile()
     {
-        var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        {
-            Email = "me@example.com",
-            Username = "meuser",
-            Password = "Password123!"
-        });
-        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var token = await CreateUserAndGetTokenAsync("me@example.com", "meuser");
 
         var request = new HttpRequestMessage(HttpMethod.Get, "/api/auth/me");
         request.Headers.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         var response = await _client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -165,17 +163,11 @@ public class AuthControllerTests : IAsyncLifetime
     [Fact]
     public async Task Refresh_WithValidToken_ReturnsNewTokens()
     {
-        var registerResponse = await _client.PostAsJsonAsync("/api/auth/register", new RegisterRequest
-        {
-            Email = "refresh@example.com",
-            Username = "refreshuser",
-            Password = "Password123!"
-        });
-        var auth = await registerResponse.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await CreateUserAndGetAuthAsync("refresh@example.com", "refreshuser");
 
         var response = await _client.PostAsJsonAsync("/api/auth/refresh", new RefreshRequest
         {
-            RefreshToken = auth!.RefreshToken
+            RefreshToken = auth.RefreshToken
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
