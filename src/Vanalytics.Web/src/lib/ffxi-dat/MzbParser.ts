@@ -1,5 +1,3 @@
-import type { ZoneMeshInstance } from './types'
-
 /**
  * Parses MZB blocks (type 0x1C) from FFXI zone DAT files.
  * Data must be decrypted via decodeMzb() before calling this.
@@ -22,13 +20,20 @@ import type { ZoneMeshInstance } from './types'
  *   long  fe,ff,fg,fh,fi,fj,fk,fl
  *
  * We build 4x4 transform matrices from scale × rotation × translation.
- * The `id[16]` field encodes the MMB prefab index.
+ * The `id[16]` field is a string name used to match against MMB prefab names.
  */
+
+export interface MzbInstance {
+  name: string          // id[16] — MMB prefab name for matching
+  transform: number[]   // 4x4 matrix (16 floats, column-major for Three.js)
+}
 
 const SMZB_HEADER_SIZE = 32
 const SMZB_BLOCK100_SIZE = 100
 
-export function parseMzbBlock(data: Uint8Array): ZoneMeshInstance[] {
+const textDecoder = new TextDecoder('utf-8')
+
+export function parseMzbBlock(data: Uint8Array): MzbInstance[] {
   if (data.length < SMZB_HEADER_SIZE + SMZB_BLOCK100_SIZE) return []
 
   const view = new DataView(data.buffer, data.byteOffset, data.byteLength)
@@ -40,18 +45,18 @@ export function parseMzbBlock(data: Uint8Array): ZoneMeshInstance[] {
     return []
   }
 
-  const instances: ZoneMeshInstance[] = []
+  const instances: MzbInstance[] = []
   const recordsStart = SMZB_HEADER_SIZE
 
   for (let i = 0; i < totalRecord100; i++) {
     const offset = recordsStart + i * SMZB_BLOCK100_SIZE
     if (offset + SMZB_BLOCK100_SIZE > data.length) break
 
-    // id[16] at offset 0 — the first 2 bytes often encode the MMB index
-    // In GalkaReeve, the id is a 16-byte string used to look up MMB by name
-    // But for mesh instancing, we use the sequential ordering
-    // The meshIndex is typically encoded in the first few bytes of id
-    const meshIndex = view.getUint16(offset, true)
+    // id[16] — MMB prefab name (null-terminated, space-padded)
+    const idBytes = data.subarray(offset, offset + 16)
+    let end = idBytes.indexOf(0)
+    if (end === -1) end = 16
+    const name = textDecoder.decode(idBytes.subarray(0, end)).trim()
 
     // Read transform components
     const fTransX = view.getFloat32(offset + 16, true)
@@ -82,7 +87,7 @@ export function parseMzbBlock(data: Uint8Array): ZoneMeshInstance[] {
       fTransX,       fTransY,       fTransZ,        1,
     ]
 
-    instances.push({ meshIndex, transform })
+    instances.push({ name, transform })
   }
 
   return instances

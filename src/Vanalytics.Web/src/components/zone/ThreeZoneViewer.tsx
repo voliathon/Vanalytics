@@ -535,34 +535,72 @@ export default function ThreeZoneViewer({ zoneData, fogDensity = 0, timeOfDay = 
       console.log('[ZoneViewer] No water meshes detected from texture names')
     }
 
-    // ── Group instances by prefab → create InstancedMesh objects ──
-    const groups = new Map<number, THREE.Matrix4[]>()
+    // ── Group instances by prefab, split by determinant sign ──
+    // Instances whose transform has a negative determinant are mirrored/reflected
+    // and need reversed triangle winding to keep correct face orientation.
+    const normalGroups = new Map<number, THREE.Matrix4[]>()
+    const mirroredGroups = new Map<number, THREE.Matrix4[]>()
     for (const inst of zoneData.instances) {
-      // Skip instances that reference sky/weather prefabs
       if (!geoMap.has(inst.meshIndex)) continue
-      let arr = groups.get(inst.meshIndex)
-      if (!arr) {
-        arr = []
-        groups.set(inst.meshIndex, arr)
-      }
       const matrix = new THREE.Matrix4()
       matrix.fromArray(inst.transform)
+      const det = matrix.determinant()
+      const target = det < 0 ? mirroredGroups : normalGroups
+      let arr = target.get(inst.meshIndex)
+      if (!arr) {
+        arr = []
+        target.set(inst.meshIndex, arr)
+      }
       arr.push(matrix)
     }
 
+    /** Clone a geometry with reversed triangle winding order */
+    function cloneWithFlippedWinding(src: THREE.BufferGeometry): THREE.BufferGeometry {
+      const clone = src.clone()
+      const index = clone.index
+      if (index) {
+        const arr = index.array as Uint16Array | Uint32Array
+        for (let i = 0; i < arr.length; i += 3) {
+          const tmp = arr[i + 1]
+          arr[i + 1] = arr[i + 2]
+          arr[i + 2] = tmp
+        }
+        index.needsUpdate = true
+      }
+      return clone
+    }
+
     const instancedMeshes: THREE.InstancedMesh[] = []
-    for (const [meshIdx, matrices] of groups) {
+
+    // Normal instances — standard winding
+    for (const [meshIdx, matrices] of normalGroups) {
       const geo = geoMap.get(meshIdx)
       const mat = matMap.get(meshIdx)
       if (!geo || !mat) continue
-
       const mesh = new THREE.InstancedMesh(geo, mat, matrices.length)
       mesh.frustumCulled = false
-      for (let i = 0; i < matrices.length; i++) {
-        mesh.setMatrixAt(i, matrices[i])
-      }
+      for (let i = 0; i < matrices.length; i++) mesh.setMatrixAt(i, matrices[i])
       mesh.instanceMatrix.needsUpdate = true
       instancedMeshes.push(mesh)
+    }
+
+    // Mirrored instances — reversed winding to correct inside-out faces
+    let mirroredCount = 0
+    for (const [meshIdx, matrices] of mirroredGroups) {
+      const geo = geoMap.get(meshIdx)
+      const mat = matMap.get(meshIdx)
+      if (!geo || !mat) continue
+      const flippedGeo = cloneWithFlippedWinding(geo)
+      geometries.push(flippedGeo) // track for disposal
+      const mesh = new THREE.InstancedMesh(flippedGeo, mat, matrices.length)
+      mesh.frustumCulled = false
+      for (let i = 0; i < matrices.length; i++) mesh.setMatrixAt(i, matrices[i])
+      mesh.instanceMatrix.needsUpdate = true
+      instancedMeshes.push(mesh)
+      mirroredCount += matrices.length
+    }
+    if (mirroredCount > 0) {
+      console.log(`[ZoneViewer] ${mirroredCount} mirrored instances with flipped winding`)
     }
 
     console.log(`[ZoneViewer] ${instancedMeshes.length} instanced draw calls (from ${zoneData.instances.length} instances)`)

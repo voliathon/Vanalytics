@@ -7,13 +7,12 @@ import type { ApiKeyResponse, GameServer } from '../types/api'
 import { useFfxiFileSystem } from '../context/FfxiFileSystemContext'
 import { Copy, Check } from 'lucide-react'
 
-type Tab = 'session' | 'preferences' | 'apikeys' | 'ffxi'
+type Tab = 'session' | 'preferences' | 'apikeys'
 
 const tabs: { id: Tab; label: string }[] = [
   { id: 'session', label: 'Session' },
   { id: 'preferences', label: 'Preferences' },
   { id: 'apikeys', label: 'API Keys' },
-  { id: 'ffxi', label: 'FFXI Installation' },
 ]
 
 export default function ProfilePage() {
@@ -300,6 +299,75 @@ export default function ProfilePage() {
               </button>
             </div>
           </section>
+
+          <section className="rounded-lg border border-gray-800 bg-gray-900 p-6 max-w-lg">
+            <h2 className="text-lg font-semibold mb-4">FFXI Installation</h2>
+
+            {!ffxi.isSupported ? (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-400">
+                  The 3D model viewer requires a Chromium-based browser (Chrome or Edge) with support for the{' '}
+                  <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                    File System Access API
+                  </a>.
+                </p>
+                <p className="text-xs text-gray-600">
+                  Your current browser does not support this feature.
+                </p>
+              </div>
+            ) : !ffxi.isConfigured ? (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-400">
+                  Connect your local FFXI installation to enable the 3D character model viewer.
+                  Files are read locally and never uploaded.
+                </p>
+                <button
+                  onClick={() => ffxi.configure()}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg"
+                >
+                  Browse for FFXI Installation
+                </button>
+                <p className="text-xs text-gray-600">
+                  This setting is stored in your browser and shared across all accounts — it points to your local FFXI installation.
+                  Requires a Chromium-based browser (Chrome or Edge) with{' '}
+                  <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                    File System Access API
+                  </a>{' '}support.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                  <p className="text-xs text-gray-500 mb-1">Connected</p>
+                  <p className="text-sm text-gray-300 break-all">{ffxi.path}</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {ffxi.isAuthorized ? (
+                    <span className="px-2 py-1 text-xs rounded bg-green-900/40 text-green-400 border border-green-800/40">
+                      Authorized
+                    </span>
+                  ) : (
+                    <span className="px-2 py-1 text-xs rounded bg-yellow-900/40 text-yellow-400 border border-yellow-800/40">
+                      Needs Permission
+                    </span>
+                  )}
+                  <button
+                    onClick={() => ffxi.disconnect()}
+                    className="text-sm text-red-400 hover:text-red-300"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600">
+                  This setting is shared across all accounts on this browser — it points to your local FFXI installation, which is the same regardless of which account you're signed into.
+                  Requires a Chromium-based browser (Chrome or Edge) with{' '}
+                  <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+                    File System Access API
+                  </a>{' '}support.
+                </p>
+              </div>
+            )}
+          </section>
         </div>
       )}
 
@@ -374,77 +442,6 @@ export default function ProfilePage() {
         </section>
       )}
 
-      {/* FFXI Installation tab */}
-      {activeTab === 'ffxi' && (
-        <section className="rounded-lg border border-gray-800 bg-gray-900 p-6 max-w-lg">
-          <h2 className="text-lg font-semibold mb-4">FFXI Installation</h2>
-
-          {!ffxi.isSupported ? (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-400">
-                The 3D model viewer requires a Chromium-based browser (Chrome or Edge) with support for the{' '}
-                <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-                  File System Access API
-                </a>.
-              </p>
-              <p className="text-xs text-gray-600">
-                Your current browser does not support this feature.
-              </p>
-            </div>
-          ) : !ffxi.isConfigured ? (
-            <div className="space-y-4">
-              <p className="text-sm text-gray-400">
-                Connect your local FFXI installation to enable the 3D character model viewer.
-                Files are read locally and never uploaded.
-              </p>
-              <button
-                onClick={() => ffxi.configure()}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg"
-              >
-                Browse for FFXI Installation
-              </button>
-              <p className="text-xs text-gray-600">
-                This setting is stored in your browser and shared across all accounts — it points to your local FFXI installation.
-                Requires a Chromium-based browser (Chrome or Edge) with{' '}
-                <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-                  File System Access API
-                </a>{' '}support.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
-                <p className="text-xs text-gray-500 mb-1">Connected</p>
-                <p className="text-sm text-gray-300 break-all">{ffxi.path}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                {ffxi.isAuthorized ? (
-                  <span className="px-2 py-1 text-xs rounded bg-green-900/40 text-green-400 border border-green-800/40">
-                    Authorized
-                  </span>
-                ) : (
-                  <span className="px-2 py-1 text-xs rounded bg-yellow-900/40 text-yellow-400 border border-yellow-800/40">
-                    Needs Permission
-                  </span>
-                )}
-                <button
-                  onClick={() => ffxi.disconnect()}
-                  className="text-sm text-red-400 hover:text-red-300"
-                >
-                  Disconnect
-                </button>
-              </div>
-              <p className="text-xs text-gray-600">
-                This setting is shared across all accounts on this browser — it points to your local FFXI installation, which is the same regardless of which account you're signed into.
-                Requires a Chromium-based browser (Chrome or Edge) with{' '}
-                <a href="https://developer.mozilla.org/en-US/docs/Web/API/File_System_API" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-                  File System Access API
-                </a>{' '}support.
-              </p>
-            </div>
-          )}
-        </section>
-      )}
     </div>
   )
 }
