@@ -16,7 +16,7 @@ import { triangleStripToList } from './MeshParser'
  *     SMMBBlockHeader (32 bytes) — numModel, bbox, numFace
  *     Per model:
  *       SMMBModelHeader (20 bytes) — textureName[16], vertexsize(u16), blending(u16)
- *       Vertices: vertexsize × SMMBBlockVertex(36) or SMMBBlockVertex2(56)
+ *       Vertices: vertexsize × SMMBBlockVertex(36) or SMMBBlockVertex2(48)
  *       Index count (uint32 masked &0xFFFF)
  *       Indices: count × uint16 (+ 2 byte padding if odd)
  */
@@ -44,7 +44,7 @@ export function parseMmbBlock(data: Uint8Array): MmbMeshResult[] {
   // From TDWAnalysis.h: SMMBHEAD2 { MMBSize:24, d1:8, d3:8, d4:8, d5:8, d6:8, name[8] }
   // d3 is at byte 4 of SMMBHEAD2, which is byte 4 of the block data
   const d3 = data[4]
-  const vertexStride = (d3 === 2) ? 56 : 36
+  const vertexStride = (d3 === 2) ? 48 : 36
 
   // ── SMMBHeader (44 bytes) ──
   // char imgID[16], int pieces, float x1,x2,y1,y2,z1,z2, uint offsetBlockHeader
@@ -115,8 +115,8 @@ export function parseMmbBlock(data: Uint8Array): MmbMeshResult[] {
         // Position
         vertices.push(reader.readFloat32(), reader.readFloat32(), reader.readFloat32())
 
-        if (vertexStride === 56) {
-          // SMMBBlockVertex2: skip dx, dy, dz (displacement)
+        if (vertexStride === 48) {
+          // SMMBBlockVertex2: skip dx, dy, dz (extra vector)
           reader.skip(12)
         }
 

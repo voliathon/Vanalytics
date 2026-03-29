@@ -104,11 +104,11 @@ export function parseZoneFile(
       if (result) {
         if (textureNameMap.has(result.name)) {
           duplicateNames.push(`"${result.name}" (first=${textureNameMap.get(result.name)}, dup=${textures.length}, ${result.texture.width}×${result.texture.height})`)
-          // Keep first occurrence — later duplicates are often weather/LOD variants
+          // Keep first occurrence — skip duplicate to avoid unreferenced entries in textures[]
         } else {
           textureNameMap.set(result.name, textures.length)
+          textures.push(result.texture)
         }
-        textures.push(result.texture)
       }
     } catch { /* skip */ }
   }
@@ -219,6 +219,9 @@ export function parseZoneFile(
   const mzbBlocks = blocks.filter(b => b.type === BLOCK_MZB)
   onProgress?.(`Parsing ${mzbBlocks.length} MZB blocks...`)
 
+  let mzbTotal = 0
+  let mzbMatched = 0
+
   for (const block of mzbBlocks) {
     const start = block.dataOffset + BLOCK_PADDING
     const len = block.dataLength - BLOCK_PADDING
@@ -227,22 +230,13 @@ export function parseZoneFile(
       const blockData = new Uint8Array(buffer, start, len)
       const decryptedData = decodeMzb(blockData)
       const rawInstances = parseMzbBlock(decryptedData)
+      mzbTotal += rawInstances.length
 
-      // Map MZB entry names to prefab indices
-      for (let i = 0; i < rawInstances.length; i++) {
-        const entryOffset = 32 + i * 100  // SMZBHeader(32) + i * sizeof(SMZBBlock100)
-        if (entryOffset + 16 > decryptedData.length) break
-
-        // Read id[16] as string
-        const idBytes = decryptedData.slice(entryOffset, entryOffset + 16)
-        let end = idBytes.indexOf(0)
-        if (end === -1) end = 16
-        const name = new TextDecoder('utf-8').decode(idBytes.subarray(0, end)).trim()
-
-        const mappings = mmbNameMap.get(name)
+      for (const inst of rawInstances) {
+        const mappings = mmbNameMap.get(inst.name)
         if (!mappings) continue
+        mzbMatched++
 
-        const inst = rawInstances[i]
         // Create instances for ALL meshes across ALL MMB blocks with this name
         for (const mapping of mappings) {
           for (let m = 0; m < mapping.count; m++) {
@@ -258,30 +252,7 @@ export function parseZoneFile(
     }
   }
 
-  const unmatchedCount = (() => {
-    // Count how many MZB entries didn't match any MMB name
-    let total = 0
-    let matched = 0
-    for (const block of mzbBlocks) {
-      const start = block.dataOffset + BLOCK_PADDING
-      const len = block.dataLength - BLOCK_PADDING
-      if (len <= 0) continue
-      const blockData = new Uint8Array(buffer, start, len)
-      const decryptedData = decodeMzb(blockData)
-      const count = (decryptedData[4] | (decryptedData[5] << 8) | (decryptedData[6] << 16)) & 0xFFFFFF
-      total = count
-      for (let i = 0; i < count; i++) {
-        const off = 32 + i * 100
-        if (off + 16 > decryptedData.length) break
-        const idBytes = decryptedData.slice(off, off + 16)
-        let end = idBytes.indexOf(0)
-        if (end === -1) end = 16
-        const name = new TextDecoder('utf-8').decode(idBytes.subarray(0, end)).trim()
-        if (mmbNameMap.has(name) && mmbNameMap.get(name)!.length > 0) matched++
-      }
-    }
-    return { total, matched }
-  })()
+  const unmatchedCount = { total: mzbTotal, matched: mzbMatched }
 
   onProgress?.(`Instances: ${instances.length} (${unmatchedCount.matched}/${unmatchedCount.total} MZB entries matched MMB names)`)
   onProgress?.(`Result: ${prefabs.length} prefabs, ${instances.length} instances, ${textures.length} textures`)
