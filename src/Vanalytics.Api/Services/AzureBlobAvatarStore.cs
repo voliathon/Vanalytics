@@ -41,7 +41,7 @@ public class AzureBlobAvatarStore : IAvatarStore
         var blobName = $"{userId}{extension}";
         var blob = _container.GetBlobClient(blobName);
         using var stream = new MemoryStream(imageData);
-        await blob.UploadAsync(stream, new BlobHttpHeaders { ContentType = contentType }, overwrite: true);
+        await blob.UploadAsync(stream, new BlobUploadOptions { HttpHeaders = new BlobHttpHeaders { ContentType = contentType } });
         return blob.Uri.ToString();
     }
 }
