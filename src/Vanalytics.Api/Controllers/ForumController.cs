@@ -79,7 +79,7 @@ public class ForumController : ControllerBase
         {
             var author = authors.GetValueOrDefault(t.AuthorId);
             return new EnrichedThreadSummaryResponse(
-                t.Id, t.Title, t.Slug, t.IsPinned, t.IsLocked,
+                t.Id, t.Title, t.Slug, t.IsPinned, t.IsLocked, t.IsDeleted,
                 t.AuthorId, t.ReplyCount, t.VoteCount,
                 t.CreatedAt, t.LastPostAt,
                 author?.Username ?? "[deleted]",
@@ -92,7 +92,8 @@ public class ForumController : ControllerBase
     [HttpGet("categories/{categorySlug}/threads/{threadSlug}")]
     public async Task<IActionResult> GetThread(string categorySlug, string threadSlug)
     {
-        var thread = await _forum.GetThreadBySlugAsync(categorySlug, threadSlug);
+        var isModerator = User.IsInRole("Moderator") || User.IsInRole("Admin");
+        var thread = await _forum.GetThreadBySlugAsync(categorySlug, threadSlug, isModerator);
         if (thread == null) return NotFound();
 
         var authors = await _authors.ResolveAuthorsAsync([thread.AuthorId]);
@@ -100,7 +101,7 @@ public class ForumController : ControllerBase
 
         return Ok(new EnrichedThreadDetailResponse(
             thread.Id, thread.Title, thread.Slug, thread.CategoryId, thread.CategoryName, thread.CategorySlug,
-            thread.IsPinned, thread.IsLocked, thread.AuthorId,
+            thread.IsPinned, thread.IsLocked, thread.IsDeleted, thread.AuthorId,
             thread.CreatedAt, thread.LastPostAt,
             author?.Username ?? "[deleted]",
             author?.AvatarHash));
@@ -344,6 +345,39 @@ public class ForumController : ControllerBase
     {
         var result = await _forum.ToggleLockAsync(threadId);
         return result ? Ok() : NotFound();
+    }
+
+    [Authorize]
+    [HttpDelete("threads/{threadId}")]
+    public async Task<IActionResult> DeleteThread(int threadId)
+    {
+        var result = await _forum.DeleteThreadAsync(threadId, GetUserId(), false);
+        return result ? NoContent() : NotFound();
+    }
+
+    [Authorize(Roles = "Moderator,Admin")]
+    [HttpDelete("threads/{threadId}/moderate")]
+    public async Task<IActionResult> ModerateDeleteThread(int threadId)
+    {
+        var result = await _forum.DeleteThreadAsync(threadId, GetUserId(), true);
+        return result ? NoContent() : NotFound();
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpPut("threads/{threadId}/restore")]
+    public async Task<IActionResult> RestoreThread(int threadId)
+    {
+        var result = await _forum.RestoreThreadAsync(threadId);
+        return result ? Ok() : NotFound();
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("threads/{threadId}/purge")]
+    public async Task<IActionResult> PurgeThread(int threadId)
+    {
+        var result = await _forum.PurgeThreadAsync(threadId,
+            storagePath => _attachmentStore.DeleteAsync(storagePath));
+        return result ? NoContent() : NotFound();
     }
 
     // === Post Moderation (Moderator+) ===

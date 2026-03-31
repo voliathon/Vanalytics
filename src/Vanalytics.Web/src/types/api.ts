@@ -211,6 +211,7 @@ export interface EnrichedThreadSummaryResponse {
   slug: string
   isPinned: boolean
   isLocked: boolean
+  isDeleted: boolean
   authorId: string
   replyCount: number
   voteCount: number
@@ -229,6 +230,7 @@ export interface ThreadDetailResponse {
   categorySlug: string
   isPinned: boolean
   isLocked: boolean
+  isDeleted: boolean
   authorId: string
   createdAt: string
   lastPostAt: string
