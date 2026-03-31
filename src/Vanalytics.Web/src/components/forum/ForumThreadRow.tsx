@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Pin, Lock, LockOpen } from 'lucide-react'
+import { Pin, Lock, LockOpen, Trash2 } from 'lucide-react'
 import type { EnrichedThreadSummaryResponse } from '../../types/api'
 import UserAvatar from '../UserAvatar'
 
@@ -29,11 +29,15 @@ export default function ForumThreadRow({ thread, categorySlug, isModerator, onTo
       onClick={() => navigate(`/forum/${categorySlug}/${thread.slug}`)}
       className={`flex items-center gap-3 px-3 py-2.5 border-b border-gray-800/50 hover:bg-gray-800/30 cursor-pointer transition-colors ${
         thread.isPinned ? 'border-l-2 border-l-blue-600' : ''
-      }`}
+      } ${thread.isDeleted ? 'opacity-50' : ''}`}
     >
       {thread.isPinned && <Pin className="h-3.5 w-3.5 text-blue-400 shrink-0" />}
       {thread.isLocked && <Lock className="h-3.5 w-3.5 text-amber-400 shrink-0" />}
-      <span className="text-sm text-gray-200 truncate flex-1 font-medium">{thread.title}</span>
+      {thread.isDeleted && <Trash2 className="h-3.5 w-3.5 text-red-400 shrink-0" />}
+      <span className="text-sm text-gray-200 truncate flex-1 font-medium">
+        {thread.title}
+        {thread.isDeleted && <span className="ml-2 text-xs text-red-400 font-normal">[Deleted]</span>}
+      </span>
       <div className="flex items-center gap-1.5 shrink-0">
         <UserAvatar username={thread.authorUsername} size="sm" />
         <span className="text-xs text-gray-500 hidden sm:inline">{thread.authorUsername}</span>

@@ -17,13 +17,10 @@ EXPOSE 8080
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG APP_VERSION=1.0.0
 WORKDIR /src
-COPY nuget.config .
 COPY ["src/Vanalytics.Core/Vanalytics.Core.csproj", "src/Vanalytics.Core/"]
 COPY ["src/Vanalytics.Data/Vanalytics.Data.csproj", "src/Vanalytics.Data/"]
 COPY ["src/Vanalytics.Api/Vanalytics.Api.csproj", "src/Vanalytics.Api/"]
-RUN --mount=type=secret,id=github_token \
-    dotnet nuget update source github --username soverance --password $(cat /run/secrets/github_token) --store-password-in-clear-text --configfile nuget.config && \
-    dotnet restore "src/Vanalytics.Api/Vanalytics.Api.csproj"
+RUN dotnet restore "src/Vanalytics.Api/Vanalytics.Api.csproj"
 COPY . .
 RUN dotnet publish "src/Vanalytics.Api/Vanalytics.Api.csproj" -c Release -o /app/publish -p:Version=$APP_VERSION
 

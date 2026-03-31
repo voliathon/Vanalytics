@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
-import { Pin, Lock } from 'lucide-react'
+import { Pin, Lock, Trash2, Flame, RotateCcw } from 'lucide-react'
 import { api, ApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import type { ThreadDetailResponse, PaginatedPosts, EnrichedPostResponse, UserProfile } from '../types/api'
@@ -57,7 +57,7 @@ export default function ForumThreadPage() {
 
   const loadMore = async () => {
     if (!thread || posts.length === 0) return
-    const afterId = posts[posts.length - 1].id
+    const afterId = posts[posts.length - 1]!.id
     setLoadingMore(true)
     try {
       const result = await api<PaginatedPosts>(
@@ -92,12 +92,49 @@ export default function ForumThreadPage() {
     }
   }
 
+  const handleDeleteThread = async () => {
+    if (!thread) return
+    if (!confirm('Delete this thread? It will be hidden from regular users.')) return
+    try {
+      const isAuthor = user?.id === thread.authorId
+      const endpoint = mod && !isAuthor
+        ? `/api/forum/threads/${thread.id}/moderate`
+        : `/api/forum/threads/${thread.id}`
+      await api(endpoint, { method: 'DELETE' })
+      navigate(`/forum/${categorySlug}`)
+    } catch {
+      alert('Failed to delete thread')
+    }
+  }
+
+  const handleRestoreThread = async () => {
+    if (!thread) return
+    try {
+      await api(`/api/forum/threads/${thread.id}/restore`, { method: 'PUT' })
+      setThread(prev => prev ? { ...prev, isDeleted: false } : prev)
+    } catch {
+      alert('Failed to restore thread')
+    }
+  }
+
+  const handlePurgeThread = async () => {
+    if (!thread) return
+    if (!confirm('PURGE this thread?\n\nThis will permanently delete the thread, all its posts, and all attachments. This cannot be undone.')) return
+    try {
+      await api(`/api/forum/threads/${thread.id}/purge`, { method: 'DELETE' })
+      navigate(`/forum/${categorySlug}`)
+    } catch {
+      alert('Failed to purge thread')
+    }
+  }
+
   const onPostCreated = () => {
     if (thread) fetchPosts(thread.id)
   }
 
   const mod = isModerator(user)
   const admin = isAdmin(user)
+  const canDelete = thread && !thread.isDeleted && (mod || user?.id === thread.authorId)
 
   const handlePurged = (threadDeleted: boolean) => {
     if (threadDeleted) {
@@ -132,6 +169,33 @@ export default function ForumThreadPage() {
         <span className="text-gray-300 truncate max-w-xs">{thread.title}</span>
       </nav>
 
+      {/* Deleted thread banner */}
+      {thread.isDeleted && mod && (
+        <div className="rounded-lg border border-red-800/50 bg-red-900/20 p-4 flex items-center justify-between gap-4">
+          <p className="text-red-400 text-sm font-medium">This thread has been deleted</p>
+          <div className="flex gap-2 shrink-0">
+            {admin && (
+              <>
+                <button
+                  onClick={handleRestoreThread}
+                  className="flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium border border-green-700 text-green-400 hover:bg-green-900/30 transition-colors"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Restore
+                </button>
+                <button
+                  onClick={handlePurgeThread}
+                  className="flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium border border-red-700 text-red-400 hover:bg-red-900/30 transition-colors"
+                >
+                  <Flame className="h-3.5 w-3.5" />
+                  Purge
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Thread header */}
       <div className="rounded-lg border border-gray-800 bg-gray-900 p-4 space-y-2">
         <div className="flex items-start justify-between gap-4">
@@ -147,30 +211,50 @@ export default function ForumThreadPage() {
               {new Date(thread.createdAt).toLocaleDateString()}
             </p>
           </div>
-          {mod && (
-            <div className="flex gap-2 shrink-0">
+          <div className="flex gap-2 shrink-0">
+            {mod && !thread.isDeleted && (
+              <>
+                <button
+                  onClick={handleTogglePin}
+                  className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                    thread.isPinned
+                      ? 'bg-blue-900/50 text-blue-300 hover:bg-blue-900'
+                      : 'border border-gray-700 text-gray-400 hover:text-blue-400'
+                  }`}
+                >
+                  {thread.isPinned ? 'Unpin' : 'Pin'}
+                </button>
+                <button
+                  onClick={handleToggleLock}
+                  className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
+                    thread.isLocked
+                      ? 'bg-amber-900/50 text-amber-300 hover:bg-amber-900'
+                      : 'border border-gray-700 text-gray-400 hover:text-amber-400'
+                  }`}
+                >
+                  {thread.isLocked ? 'Unlock' : 'Lock'}
+                </button>
+              </>
+            )}
+            {canDelete && (
               <button
-                onClick={handleTogglePin}
-                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-                  thread.isPinned
-                    ? 'bg-blue-900/50 text-blue-300 hover:bg-blue-900'
-                    : 'border border-gray-700 text-gray-400 hover:text-blue-400'
-                }`}
+                onClick={handleDeleteThread}
+                className="rounded px-3 py-1.5 text-xs font-medium border border-gray-700 text-gray-400 hover:text-red-400 hover:border-red-700 transition-colors"
+                title="Delete thread"
               >
-                {thread.isPinned ? 'Unpin' : 'Pin'}
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
+            )}
+            {admin && !thread.isDeleted && (
               <button
-                onClick={handleToggleLock}
-                className={`rounded px-3 py-1.5 text-xs font-medium transition-colors ${
-                  thread.isLocked
-                    ? 'bg-amber-900/50 text-amber-300 hover:bg-amber-900'
-                    : 'border border-gray-700 text-gray-400 hover:text-amber-400'
-                }`}
+                onClick={handlePurgeThread}
+                className="rounded px-3 py-1.5 text-xs font-medium border border-gray-700 text-gray-400 hover:text-red-400 hover:border-red-700 transition-colors"
+                title="Purge permanently"
               >
-                {thread.isLocked ? 'Unlock' : 'Lock'}
+                <Flame className="h-3.5 w-3.5" />
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
@@ -211,7 +295,9 @@ export default function ForumThreadPage() {
 
       {/* Reply section */}
       <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
-        {thread.isLocked ? (
+        {thread.isDeleted ? (
+          <p className="text-center text-red-400 text-sm py-4">This thread has been deleted.</p>
+        ) : thread.isLocked ? (
           <p className="text-center text-amber-400 text-sm py-4">This thread is locked.</p>
         ) : user ? (
           <ForumReplyBox threadId={thread.id} onPostCreated={onPostCreated} />
