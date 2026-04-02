@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Loader2, MonitorSmartphone, FolderOpen, Settings } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Loader2, MonitorSmartphone, FolderOpen } from 'lucide-react'
 import { useFfxiFileSystem } from '../../context/FfxiFileSystemContext'
 import CharacterScene from './CharacterScene'
 import CharacterModel from './CharacterModel'
@@ -21,7 +20,7 @@ interface ModelViewerProps {
 }
 
 export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, onRequestFullscreen, favoriteAnimation, onSaveFavorite }: ModelViewerProps) {
-  const { isSupported, isConfigured, isAuthorized, loading, authorize } = useFfxiFileSystem()
+  const { isSupported, isConfigured, isAuthorized, loading, configure, authorize } = useFfxiFileSystem()
   const [loadingSlots, setLoadingSlots] = useState(new Set<number>())
 
   // Animation state — hooks must be called before any early returns
@@ -61,8 +60,8 @@ export default function ModelViewer({ race, gender, gear: _gear, slotDatPaths, o
   if (!isConfigured) return (
     <ViewerShell>
       <FolderOpen className="h-8 w-8 text-gray-600 mb-2" />
-      <p className="text-sm text-gray-400 mb-2">Configure your FFXI installation to view 3D models</p>
-      <Link to="/profile" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"><Settings className="h-3 w-3" />Open Settings</Link>
+      <p className="text-sm text-gray-400 mb-2">Connect your FFXI installation to view 3D models</p>
+      <button onClick={configure} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors">Connect FFXI Installation</button>
     </ViewerShell>
   )
   if (!isAuthorized) return (
