@@ -40,9 +40,28 @@ function LandingContent() {
   if (loading || user) return null
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
+    <div className="relative min-h-screen bg-gray-950 text-gray-100">
+      {/* Background orb */}
+      <div className="pointer-events-none fixed inset-0 flex items-center justify-center" style={{ zIndex: 0 }}>
+        <div className="relative w-[675px] h-[675px]">
+          <img
+            src="/vanalytics-square-logo.png"
+            alt=""
+            className="w-full h-full animate-orb-pulse"
+          />
+          {/* Lava glow overlay — targets the warm center of the orb */}
+          <div
+            className="absolute inset-0 animate-lava-glow"
+            style={{
+              background: 'radial-gradient(ellipse 40% 35% at 50% 55%, rgba(255, 120, 30, 0.35) 0%, rgba(255, 60, 10, 0.15) 40%, transparent 70%)',
+              mixBlendMode: 'screen',
+            }}
+          />
+        </div>
+      </div>
+
       {/* Hero */}
-      <div className="mx-auto max-w-5xl px-4 py-20 text-center">
+      <div className="relative mx-auto max-w-5xl px-4 py-20 text-center" style={{ zIndex: 1 }}>
         <div className="flex items-center justify-center mb-6">
           <img src="/vanalytics-square-logo.png" alt="" className="h-16 w-16 shrink-0 -mr-2" />
           <img src="/vanalytics-typography-horizontal-logo.png" alt="Vana'lytics" className="max-w-[280px]" />
@@ -59,7 +78,7 @@ function LandingContent() {
       </div>
 
       {/* Feature sections */}
-      <div className="mx-auto max-w-6xl px-4">
+      <div className="relative mx-auto max-w-6xl px-4" style={{ zIndex: 1 }}>
         {features.map((feature, index) => {
           const imageLeft = index % 2 === 0
           return (
@@ -96,14 +115,7 @@ function LandingContent() {
               <div className={`w-full lg:w-1/2 ${imageLeft ? '' : 'lg:order-1'}`}>
                 <h2 className="text-2xl font-bold mb-4">{feature.title}</h2>
                 <p className="text-gray-400 leading-relaxed">{feature.description}</p>
-                {index === features.length - 1 && (
-                  <button
-                    onClick={openLogin}
-                    className="mt-6 rounded-lg bg-blue-600 px-6 py-2.5 font-medium hover:bg-blue-500 transition-colors"
-                  >
-                    Get Started
-                  </button>
-                )}
+
               </div>
             </div>
           )
@@ -111,7 +123,7 @@ function LandingContent() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 mt-16">
+      <footer className="relative border-t border-gray-800 mt-16" style={{ zIndex: 1 }}>
         <div className="mx-auto max-w-6xl px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
           <span>Vanalytics v{__APP_VERSION__}</span>
           <div className="flex items-center gap-6">
