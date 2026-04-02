@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import type { ThreadDetailResponse, PaginatedPosts, EnrichedPostResponse, UserProfile } from '../types/api'
 import ForumPost from '../components/forum/ForumPost'
 import ForumReplyBox from '../components/forum/ForumReplyBox'
+import ConfirmModal from '../components/ConfirmModal'
 
 function isModerator(user: UserProfile | null): boolean {
   return user?.role === 'Moderator' || user?.role === 'Admin'
@@ -27,6 +28,8 @@ export default function ForumThreadPage() {
   const [loadingPosts, setLoadingPosts] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false)
 
   useEffect(() => {
     if (!categorySlug || !threadSlug) return
@@ -94,7 +97,6 @@ export default function ForumThreadPage() {
 
   const handleDeleteThread = async () => {
     if (!thread) return
-    if (!confirm('Delete this thread? It will be hidden from regular users.')) return
     try {
       const isAuthor = user?.id === thread.authorId
       const endpoint = mod && !isAuthor
@@ -119,7 +121,6 @@ export default function ForumThreadPage() {
 
   const handlePurgeThread = async () => {
     if (!thread) return
-    if (!confirm('PURGE this thread?\n\nThis will permanently delete the thread, all its posts, and all attachments. This cannot be undone.')) return
     try {
       await api(`/api/forum/threads/${thread.id}/purge`, { method: 'DELETE' })
       navigate(`/forum/${categorySlug}`)
@@ -184,7 +185,7 @@ export default function ForumThreadPage() {
                   Restore
                 </button>
                 <button
-                  onClick={handlePurgeThread}
+                  onClick={() => setShowPurgeConfirm(true)}
                   className="flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium border border-red-700 text-red-400 hover:bg-red-900/30 transition-colors"
                 >
                   <Flame className="h-3.5 w-3.5" />
@@ -238,7 +239,7 @@ export default function ForumThreadPage() {
             )}
             {canDelete && (
               <button
-                onClick={handleDeleteThread}
+                onClick={() => setShowDeleteConfirm(true)}
                 className="rounded px-3 py-1.5 text-xs font-medium border border-gray-700 text-gray-400 hover:text-red-400 hover:border-red-700 transition-colors"
                 title="Delete thread"
               >
@@ -247,7 +248,7 @@ export default function ForumThreadPage() {
             )}
             {admin && !thread.isDeleted && (
               <button
-                onClick={handlePurgeThread}
+                onClick={() => setShowPurgeConfirm(true)}
                 className="rounded px-3 py-1.5 text-xs font-medium border border-gray-700 text-gray-400 hover:text-red-400 hover:border-red-700 transition-colors"
                 title="Purge permanently"
               >
@@ -308,6 +309,25 @@ export default function ForumThreadPage() {
           </p>
         )}
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmModal
+          message="Delete this thread? It will be hidden from regular users."
+          confirmLabel="Delete"
+          onConfirm={() => { handleDeleteThread(); setShowDeleteConfirm(false) }}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+      {showPurgeConfirm && (
+        <ConfirmModal
+          message="Permanently delete this thread, all its posts, and all attachments."
+          confirmLabel="Purge"
+          variant="danger"
+          confirmText="PURGE"
+          onConfirm={() => { handlePurgeThread(); setShowPurgeConfirm(false) }}
+          onCancel={() => setShowPurgeConfirm(false)}
+        />
+      )}
     </div>
   )
 }

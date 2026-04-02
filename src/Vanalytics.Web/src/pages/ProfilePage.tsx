@@ -6,6 +6,7 @@ import UserAvatar from '../components/UserAvatar'
 import type { ApiKeyResponse, GameServer } from '../types/api'
 import { useFfxiFileSystem } from '../context/FfxiFileSystemContext'
 import { Copy, Check } from 'lucide-react'
+import ConfirmModal from '../components/ConfirmModal'
 
 type Tab = 'session' | 'preferences' | 'apikeys'
 
@@ -40,6 +41,7 @@ export default function ProfilePage() {
 
   // API key state
   const [apiKey, setApiKey] = useState<string | null>(null)
+  const [showRevokeConfirm, setShowRevokeConfirm] = useState(false)
   const [keyLoading, setKeyLoading] = useState(false)
   const [keyError, setKeyError] = useState('')
   const [copied, setCopied] = useState(false)
@@ -142,7 +144,6 @@ export default function ProfilePage() {
   }
 
   const handleRevokeKey = async () => {
-    if (!confirm('Revoke your API key? The Windower addon will stop syncing.')) return
     setKeyError('')
     setKeyLoading(true)
     try {
@@ -431,7 +432,7 @@ export default function ProfilePage() {
 
             {(apiKey || user.hasApiKey) && (
               <button
-                onClick={handleRevokeKey}
+                onClick={() => setShowRevokeConfirm(true)}
                 disabled={keyLoading}
                 className="rounded border border-red-700 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-900/30 disabled:opacity-50"
               >
@@ -442,6 +443,14 @@ export default function ProfilePage() {
         </section>
       )}
 
+      {showRevokeConfirm && (
+        <ConfirmModal
+          message="Revoke your API key? The Windower addon will stop syncing."
+          confirmLabel="Revoke"
+          onConfirm={() => { handleRevokeKey(); setShowRevokeConfirm(false) }}
+          onCancel={() => setShowRevokeConfirm(false)}
+        />
+      )}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext'
 import { useLoginModal } from '../context/LoginModalContext'
 import type { CharacterSummary } from '../types/api'
 import CharacterCard from '../components/CharacterCard'
+import ConfirmModal from '../components/ConfirmModal'
 
 export default function CharactersPage() {
   const { user, loading: authLoading } = useAuth()
@@ -11,6 +12,7 @@ export default function CharactersPage() {
   const [characters, setCharacters] = useState<CharacterSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
 
   const fetchCharacters = async () => {
     try {
@@ -28,7 +30,6 @@ export default function CharactersPage() {
   }, [user])
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this character?')) return
     try {
       await api(`/api/characters/${id}`, { method: 'DELETE' })
       fetchCharacters()
@@ -80,10 +81,18 @@ export default function CharactersPage() {
             <CharacterCard
               key={c.id}
               character={c}
-              onDelete={handleDelete}
+              onDelete={(id) => setPendingDelete(id)}
             />
           ))}
         </div>
+      )}
+      {pendingDelete && (
+        <ConfirmModal
+          message="Delete this character?"
+          confirmLabel="Delete"
+          onConfirm={() => { handleDelete(pendingDelete); setPendingDelete(null) }}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   )
