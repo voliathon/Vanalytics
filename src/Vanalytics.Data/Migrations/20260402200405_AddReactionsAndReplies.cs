@@ -66,7 +66,7 @@ namespace Vanalytics.Data.Migrations
                 column: "ReplyToPostId",
                 principalTable: "ForumPost",
                 principalColumn: "Id",
-                onDelete: ReferentialAction.SetNull);
+                onDelete: ReferentialAction.NoAction);
         }
 
         /// <inheritdoc />

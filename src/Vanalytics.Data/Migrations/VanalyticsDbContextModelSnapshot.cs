@@ -1743,7 +1743,7 @@ namespace Vanalytics.Data.Migrations
                     b.HasOne("Soverance.Forum.Models.ForumPost", "ReplyToPost")
                         .WithMany()
                         .HasForeignKey("ReplyToPostId")
-                        .OnDelete(DeleteBehavior.SetNull);
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("Soverance.Forum.Models.ForumThread", "Thread")
                         .WithMany("Posts")
