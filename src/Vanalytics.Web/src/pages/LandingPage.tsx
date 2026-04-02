@@ -9,19 +9,22 @@ const features = [
     title: 'Track Your Character',
     description:
       'See your character in full 3D with real-time gear updates. Browse your inventory, review session performance, and edit macros — all synced automatically from the game through a lightweight Windower addon.',
-    image: '/img/landing/character-tracker.webp',
+    media: '/img/landing/character-tracker.webp',
+    type: 'image' as const,
   },
   {
     title: 'Explore the World',
     description:
       'Browse every weapon, armor piece, and NPC rendered in 3D. Fly through zone environments with dynamic lighting and spawn overlays. All models are parsed directly from the game\'s data files.',
-    image: '/img/landing/model-viewers.webp',
+    media: '/img/landing/model-viewers.webm',
+    type: 'video' as const,
   },
   {
     title: 'Seamless Sync',
     description:
       'A lightweight Windower addon pushes your character data to Vanalytics in real-time. Generate an API key, install the addon, and your jobs, gear, inventory, and crafting skills appear automatically.',
-    image: '/img/landing/windower-addon.webp',
+    media: '/img/landing/windower-addon.webm',
+    type: 'video' as const,
   },
 ]
 
@@ -65,17 +68,30 @@ function LandingContent() {
               className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12 py-16 lg:py-24"
             >
               <div className={`w-full lg:w-1/2 ${imageLeft ? '' : 'lg:order-2'}`}>
-                <img
-                  src={feature.image}
-                  alt={feature.title}
-                  className="w-full rounded-lg border border-gray-800"
-                  onError={(e) => {
-                    const target = e.currentTarget
-                    target.style.display = 'none'
-                    target.nextElementSibling?.classList.remove('hidden')
-                  }}
-                />
-                <div className="hidden aspect-[8/5] w-full rounded-lg border border-gray-800 bg-gray-800" />
+                {feature.type === 'video' ? (
+                  <video
+                    src={feature.media}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-full rounded-lg border border-gray-800"
+                  />
+                ) : (
+                  <>
+                    <img
+                      src={feature.media}
+                      alt={feature.title}
+                      className="w-full rounded-lg border border-gray-800"
+                      onError={(e) => {
+                        const target = e.currentTarget
+                        target.style.display = 'none'
+                        target.nextElementSibling?.classList.remove('hidden')
+                      }}
+                    />
+                    <div className="hidden aspect-[8/5] w-full rounded-lg border border-gray-800 bg-gray-800" />
+                  </>
+                )}
               </div>
               <div className={`w-full lg:w-1/2 ${imageLeft ? '' : 'lg:order-1'}`}>
                 <h2 className="text-2xl font-bold mb-4">{feature.title}</h2>
