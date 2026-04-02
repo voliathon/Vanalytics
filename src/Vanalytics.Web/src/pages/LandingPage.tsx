@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLoginModal, LoginModalProvider } from '../context/LoginModalContext'
@@ -32,10 +32,18 @@ function LandingContent() {
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const { isOpen: loginOpen, open: openLogin, close: closeLogin } = useLoginModal()
+  const [version, setVersion] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading && user) navigate('/characters', { replace: true })
   }, [user, loading, navigate])
+
+  useEffect(() => {
+    fetch('/health')
+      .then((r) => r.json())
+      .then((d) => setVersion(d.version ?? null))
+      .catch(() => {})
+  }, [])
 
   if (loading || user) return null
 
@@ -43,7 +51,7 @@ function LandingContent() {
     <div className="relative min-h-screen bg-gray-950 text-gray-100">
       {/* Background orb */}
       <div className="pointer-events-none fixed inset-0 flex items-center justify-center" style={{ zIndex: 0 }}>
-        <div className="relative w-[675px] h-[675px]">
+        <div className="relative w-[675px] max-w-full aspect-square">
           <img
             src="/vanalytics-square-logo.png"
             alt=""
@@ -125,7 +133,7 @@ function LandingContent() {
       {/* Footer */}
       <footer className="relative border-t border-gray-800 mt-16" style={{ zIndex: 1 }}>
         <div className="mx-auto max-w-6xl px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
-          <span>Vanalytics v{__APP_VERSION__}</span>
+          <span>Vanalytics {version ? `v${version}` : ''}</span>
           <div className="flex items-center gap-6">
             <a href="https://soverance.com/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">Privacy</a>
             <a href="https://soverance.com/terms" target="_blank" rel="noopener noreferrer" className="hover:text-gray-300 transition-colors">Terms</a>
