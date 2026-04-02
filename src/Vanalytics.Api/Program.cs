@@ -311,6 +311,45 @@ app.MapGet("/health", async (VanalyticsDbContext db, IHostEnvironment env) =>
     }, statusCode: dbHealthy ? 200 : 503);
 });
 
+// Dynamic sitemap for search engine discovery
+app.MapGet("/sitemap.xml", async (VanalyticsDbContext db, HttpContext ctx) =>
+{
+    var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+    var sb = new System.Text.StringBuilder();
+    sb.AppendLine("""<?xml version="1.0" encoding="UTF-8"?>""");
+    sb.AppendLine("""<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">""");
+
+    // Static pages
+    foreach (var path in new[] { "/", "/items", "/server/status", "/server/clock", "/forum", "/setup" })
+    {
+        sb.AppendLine($"  <url><loc>{baseUrl}{path}</loc><changefreq>weekly</changefreq></url>");
+    }
+
+    // All items
+    var itemIds = await db.GameItems
+        .OrderBy(i => i.ItemId)
+        .Select(i => i.ItemId)
+        .ToListAsync();
+    foreach (var id in itemIds)
+    {
+        sb.AppendLine($"  <url><loc>{baseUrl}/items/{id}</loc><changefreq>monthly</changefreq></url>");
+    }
+
+    // Public character profiles
+    var profiles = await db.Characters
+        .Where(c => c.IsPublic)
+        .Select(c => new { c.Server, c.Name })
+        .ToListAsync();
+    foreach (var p in profiles)
+    {
+        sb.AppendLine($"  <url><loc>{baseUrl}/{Uri.EscapeDataString(p.Server)}/{Uri.EscapeDataString(p.Name)}</loc><changefreq>daily</changefreq></url>");
+    }
+
+    sb.AppendLine("</urlset>");
+    ctx.Response.ContentType = "application/xml; charset=utf-8";
+    await ctx.Response.WriteAsync(sb.ToString());
+});
+
 // SPA fallback: serve index.html with injected OpenGraph meta tags
 app.UseMiddleware<OpenGraphMiddleware>();
 

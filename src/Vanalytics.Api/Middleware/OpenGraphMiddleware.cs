@@ -166,6 +166,8 @@ public partial class OpenGraphMiddleware
     {
         var meta = $"""
             <title>{Encode(tags.Title)}</title>
+            <meta name="description" content="{Encode(tags.Description)}" />
+            <link rel="canonical" href="{Encode(tags.Url)}" />
             <meta property="og:title" content="{Encode(tags.Title)}" />
             <meta property="og:description" content="{Encode(tags.Description)}" />
             <meta property="og:image" content="{Encode(tags.Image)}" />
