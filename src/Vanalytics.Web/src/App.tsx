@@ -110,18 +110,18 @@ export default function App() {
             <Route path="/clock" element={<Navigate to="/server/clock" replace />} />
 
             {/* Protected routes */}
-            <Route path="/characters" element={<ProtectedRoute><CharactersPage /></ProtectedRoute>} />
+            <Route path="/characters" element={<CharactersPage />} />
             <Route path="/characters/:id" element={<ProtectedRoute><CharacterDetailPage /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
-            <Route path="/items" element={<ProtectedRoute><ItemDatabasePage /></ProtectedRoute>} />
-            <Route path="/items/:id" element={<ProtectedRoute><ItemDetailPage /></ProtectedRoute>} />
+            <Route path="/items" element={<ItemDatabasePage />} />
+            <Route path="/items/:id" element={<ItemDetailPage />} />
             {/* <Route path="/bazaar" element={<ProtectedRoute><BazaarActivityPage /></ProtectedRoute>} /> */}
-<Route path="/setup" element={<ProtectedRoute><SetupGuidePage /></ProtectedRoute>} />
+            <Route path="/setup" element={<SetupGuidePage />} />
             <Route path="/admin/users" element={<ProtectedRoute requiredRole="Admin"><AdminUsersPage /></ProtectedRoute>} />
             <Route path="/admin/data" element={<ProtectedRoute requiredRole="Admin"><AdminItemsPage /></ProtectedRoute>} />
             <Route path="/admin/saml" element={<ProtectedRoute requiredRole="Admin"><AdminSamlPage /></ProtectedRoute>} />
-            <Route path="/npcs" element={<ProtectedRoute><NpcBrowserPage /></ProtectedRoute>} />
-            <Route path="/zones" element={<ProtectedRoute><ZoneBrowserPage /></ProtectedRoute>} />
+            <Route path="/npcs" element={<NpcBrowserPage />} />
+            <Route path="/zones" element={<ZoneBrowserPage />} />
             <Route path="/sessions/:id" element={<ProtectedRoute><SessionReportPage /></ProtectedRoute>} />
             <Route path="/debug/models" element={<ProtectedRoute><ModelDebugPage /></ProtectedRoute>} />
 

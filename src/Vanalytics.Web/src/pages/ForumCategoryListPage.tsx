@@ -5,6 +5,7 @@ import type { CategoryResponse, UserProfile } from '../types/api'
 import ForumCategoryCard from '../components/forum/ForumCategoryCard'
 import ForumCategoryManager from '../components/forum/ForumCategoryManager'
 import ForumSearchBar from '../components/forum/ForumSearchBar'
+import ConfirmModal from '../components/ConfirmModal'
 
 function isModerator(user: UserProfile | null): boolean {
   return user?.role === 'Moderator' || user?.role === 'Admin'
@@ -16,6 +17,7 @@ export default function ForumCategoryListPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editingCategory, setEditingCategory] = useState<CategoryResponse | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<number | null>(null)
 
   const fetchCategories = () => {
     setLoading(true)
@@ -34,12 +36,11 @@ export default function ForumCategoryListPage() {
   }, [])
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Delete this category? This cannot be undone.')) return
     try {
       await api(`/api/forum/categories/${id}`, { method: 'DELETE' })
       fetchCategories()
     } catch {
-      alert('Failed to delete category')
+      setError('Failed to delete category')
     }
   }
 
@@ -55,6 +56,12 @@ export default function ForumCategoryListPage() {
       <div className="max-w-lg mb-4">
         <ForumSearchBar />
       </div>
+
+      {error && (
+        <div className="rounded bg-red-900/50 border border-red-700 p-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
 
       {mod && (
         <ForumCategoryManager
@@ -80,10 +87,18 @@ export default function ForumCategoryListPage() {
               category={cat}
               isModerator={mod}
               onEdit={mod ? setEditingCategory : undefined}
-              onDelete={mod ? handleDelete : undefined}
+              onDelete={mod ? (id) => setPendingDelete(id) : undefined}
             />
           ))}
         </div>
+      )}
+      {pendingDelete !== null && (
+        <ConfirmModal
+          message="Delete this category? This cannot be undone."
+          confirmLabel="Delete"
+          onConfirm={() => { handleDelete(pendingDelete); setPendingDelete(null) }}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   )

@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react'
 import { api, ApiError } from '../api/client'
+import { useAuth } from '../context/AuthContext'
+import { useLoginModal } from '../context/LoginModalContext'
 import type { CharacterSummary } from '../types/api'
 import CharacterCard from '../components/CharacterCard'
+import ConfirmModal from '../components/ConfirmModal'
 
 export default function CharactersPage() {
+  const { user, loading: authLoading } = useAuth()
+  const { open: openLogin } = useLoginModal()
   const [characters, setCharacters] = useState<CharacterSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
 
   const fetchCharacters = async () => {
     try {
@@ -20,17 +26,35 @@ export default function CharactersPage() {
   }
 
   useEffect(() => {
-    fetchCharacters()
-  }, [])
+    if (user) fetchCharacters()
+  }, [user])
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this character?')) return
     try {
       await api(`/api/characters/${id}`, { method: 'DELETE' })
       fetchCharacters()
     } catch (err) {
       if (err instanceof ApiError) setError(err.message)
     }
+  }
+
+  if (authLoading) return <p className="text-gray-400">Loading...</p>
+
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center py-24 text-center">
+        <h1 className="text-2xl font-bold mb-3">Sign in to view your characters</h1>
+        <p className="text-gray-400 max-w-md mb-6">
+          Track your FFXI characters with real-time gear updates, inventory sync, and session analytics.
+        </p>
+        <button
+          onClick={openLogin}
+          className="rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+        >
+          Sign In
+        </button>
+      </div>
+    )
   }
 
   if (loading) return <p className="text-gray-400">Loading characters...</p>
@@ -57,10 +81,18 @@ export default function CharactersPage() {
             <CharacterCard
               key={c.id}
               character={c}
-              onDelete={handleDelete}
+              onDelete={(id) => setPendingDelete(id)}
             />
           ))}
         </div>
+      )}
+      {pendingDelete && (
+        <ConfirmModal
+          message="Delete this character?"
+          confirmLabel="Delete"
+          onConfirm={() => { handleDelete(pendingDelete); setPendingDelete(null) }}
+          onCancel={() => setPendingDelete(null)}
+        />
       )}
     </div>
   )

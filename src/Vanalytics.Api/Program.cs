@@ -10,6 +10,8 @@ using Soverance.Auth.Services;
 using Soverance.Forum.Extensions;
 using Soverance.Forum.Services;
 using Soverance.Data.Extensions;
+using Microsoft.AspNetCore.ResponseCompression;
+using Microsoft.Net.Http.Headers;
 using Vanalytics.Api.Middleware;
 using Vanalytics.Api.Services;
 using Vanalytics.Api.Services.Sync;
@@ -30,6 +32,24 @@ builder.Services.AddMemoryCache();
 builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+
+// Response compression — gzip and brotli for all text-based responses
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    options.MimeTypes = ResponseCompressionDefaults.MimeTypes.Concat([
+        "application/javascript",
+        "application/json",
+        "text/css",
+        "image/svg+xml",
+    ]);
+});
+builder.Services.Configure<BrotliCompressionProviderOptions>(options =>
+    options.Level = System.IO.Compression.CompressionLevel.Fastest);
+builder.Services.Configure<GzipCompressionProviderOptions>(options =>
+    options.Level = System.IO.Compression.CompressionLevel.Fastest);
 
 // CORS — allow only configured origins (browser-enforced; does not affect non-browser
 // clients like the Windower addon, which use native HTTP and bypass CORS entirely)
@@ -162,6 +182,9 @@ if (!app.Environment.IsDevelopment())
     });
 }
 
+// Response compression — must be early in pipeline, before static files
+app.UseResponseCompression();
+
 // Global error handling — catches unhandled exceptions and returns clean JSON
 app.UseMiddleware<ExceptionHandlerMiddleware>();
 
@@ -217,7 +240,23 @@ else
 }
 
 // Serve the embedded SPA (Vanalytics.Web built into wwwroot/)
-app.UseStaticFiles();
+// Vite outputs hashed filenames (e.g. main.a1b2c3.js) in /assets/ — cache immutably.
+// Other files (index.html, logos, landing media) get a short cache with revalidation.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var path = ctx.Context.Request.Path.Value ?? "";
+        if (path.StartsWith("/assets/", StringComparison.OrdinalIgnoreCase))
+        {
+            ctx.Context.Response.Headers[HeaderNames.CacheControl] = "public, max-age=31536000, immutable";
+        }
+        else
+        {
+            ctx.Context.Response.Headers[HeaderNames.CacheControl] = "public, max-age=3600, must-revalidate";
+        }
+    }
+});
 
 app.UseCors();
 app.UseAuthentication();
@@ -272,8 +311,47 @@ app.MapGet("/health", async (VanalyticsDbContext db, IHostEnvironment env) =>
     }, statusCode: dbHealthy ? 200 : 503);
 });
 
-// SPA fallback: serve index.html for unmatched non-file, non-API requests
-app.MapFallbackToFile("index.html");
+// Dynamic sitemap for search engine discovery
+app.MapGet("/sitemap.xml", async (VanalyticsDbContext db, HttpContext ctx) =>
+{
+    var baseUrl = $"{ctx.Request.Scheme}://{ctx.Request.Host}";
+    var sb = new System.Text.StringBuilder();
+    sb.AppendLine("""<?xml version="1.0" encoding="UTF-8"?>""");
+    sb.AppendLine("""<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">""");
+
+    // Static pages
+    foreach (var path in new[] { "/", "/items", "/server/status", "/server/clock", "/forum", "/setup" })
+    {
+        sb.AppendLine($"  <url><loc>{baseUrl}{path}</loc><changefreq>weekly</changefreq></url>");
+    }
+
+    // All items
+    var itemIds = await db.GameItems
+        .OrderBy(i => i.ItemId)
+        .Select(i => i.ItemId)
+        .ToListAsync();
+    foreach (var id in itemIds)
+    {
+        sb.AppendLine($"  <url><loc>{baseUrl}/items/{id}</loc><changefreq>monthly</changefreq></url>");
+    }
+
+    // Public character profiles
+    var profiles = await db.Characters
+        .Where(c => c.IsPublic)
+        .Select(c => new { c.Server, c.Name })
+        .ToListAsync();
+    foreach (var p in profiles)
+    {
+        sb.AppendLine($"  <url><loc>{baseUrl}/{Uri.EscapeDataString(p.Server)}/{Uri.EscapeDataString(p.Name)}</loc><changefreq>daily</changefreq></url>");
+    }
+
+    sb.AppendLine("</urlset>");
+    ctx.Response.ContentType = "application/xml; charset=utf-8";
+    await ctx.Response.WriteAsync(sb.ToString());
+});
+
+// SPA fallback: serve index.html with injected OpenGraph meta tags
+app.UseMiddleware<OpenGraphMiddleware>();
 
 app.Run();
 

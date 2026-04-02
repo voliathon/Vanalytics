@@ -101,7 +101,7 @@ export default function Layout() {
 function LayoutInner() {
   const { user } = useAuth()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { isOpen: loginOpen, close: closeLogin } = useLoginModal()
+  const { isOpen: loginOpen, open: openLogin, close: closeLogin } = useLoginModal()
   const [version, setVersion] = useState<string | null>(null)
 
   useEffect(() => {
@@ -143,7 +143,7 @@ function LayoutInner() {
       >
         {/* Logo */}
         <div className="border-b border-gray-800 px-4 py-4">
-          <Link to="/characters" className="flex items-center min-w-0" onClick={() => setSidebarOpen(false)}>
+          <Link to={user ? '/characters' : '/'} className="flex items-center min-w-0" onClick={() => setSidebarOpen(false)}>
             <img src="/vanalytics-square-logo.png" alt="" className="h-10 w-10 shrink-0 -mr-1" />
             <img
               src="/vanalytics-typography-horizontal-logo.png"
@@ -194,23 +194,34 @@ function LayoutInner() {
         </div>
 
         {/* User profile */}
-        <NavLink
-          to="/profile"
-          onClick={() => setSidebarOpen(false)}
-          className={({ isActive }) =>
-            `flex items-center gap-3 border-t border-gray-800 px-4 py-3 transition-colors ${
-              isActive
-                ? 'bg-gray-800'
-                : 'hover:bg-gray-800/50'
-            }`
-          }
-        >
-          <UserAvatar username={user?.username ?? ''} displayName={user?.displayName} avatarUrl={user?.avatarUrl} size="sm" />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-200 truncate">{user?.displayName ?? user?.username}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+        {user ? (
+          <NavLink
+            to="/profile"
+            onClick={() => setSidebarOpen(false)}
+            className={({ isActive }) =>
+              `flex items-center gap-3 border-t border-gray-800 px-4 py-3 transition-colors ${
+                isActive
+                  ? 'bg-gray-800'
+                  : 'hover:bg-gray-800/50'
+              }`
+            }
+          >
+            <UserAvatar username={user.username ?? ''} displayName={user.displayName} avatarUrl={user.avatarUrl} size="sm" />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-200 truncate">{user.displayName ?? user.username}</p>
+              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+            </div>
+          </NavLink>
+        ) : (
+          <div className="border-t border-gray-800 px-4 py-3">
+            <button
+              onClick={() => { openLogin(); setSidebarOpen(false) }}
+              className="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+            >
+              Sign In
+            </button>
           </div>
-        </NavLink>
+        )}
       </aside>
 
       {/* Main content area */}
@@ -224,7 +235,7 @@ function LayoutInner() {
           >
             <Menu className="h-6 w-6" />
           </button>
-          <Link to="/characters" className="flex items-center min-w-0">
+          <Link to={user ? '/characters' : '/'} className="flex items-center min-w-0">
             <img src="/vanalytics-square-logo.png" alt="" className="h-10 w-10 shrink-0 -mr-1" />
             <img src="/vanalytics-typography-horizontal-logo.png" alt="Vana'lytics" className="min-w-0 max-w-[180px]" />
           </Link>

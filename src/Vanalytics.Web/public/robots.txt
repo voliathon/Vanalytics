@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /profile
+Disallow: /oauth/
+
+Sitemap: https://vanalytics.soverance.com/sitemap.xml

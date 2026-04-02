@@ -27,6 +27,7 @@ export default function ItemDetailPage() {
   const [loading, setLoading] = useState(true)
   const [bazaarListings, setBazaarListings] = useState<BazaarListingItem[]>([])
   const { addItem, removeItem, isSelected, isFull } = useCompare()
+  const [copied, setCopied] = useState(false)
 
   // Load item detail
   useEffect(() => {
@@ -165,6 +166,16 @@ export default function ItemDetailPage() {
             >
               [FFXIAH]
             </a>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="text-xs text-blue-400 hover:text-blue-300 hover:underline"
+            >
+              {copied ? '✓ Copied!' : '[Copy Link]'}
+            </button>
           </div>
           </div>
         </div>

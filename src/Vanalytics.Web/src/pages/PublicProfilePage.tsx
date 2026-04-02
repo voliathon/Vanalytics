@@ -18,6 +18,7 @@ export default function PublicProfilePage() {
   const [notFound, setNotFound] = useState(false)
   const [activeTab, setActiveTab] = useState<StatTab>('Jobs')
   const [itemCache, setItemCache] = useState<Map<number, GameItemDetail>>(new Map())
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     fetch(`/api/profiles/${server}/${name}`)
@@ -76,6 +77,20 @@ export default function PublicProfilePage() {
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <main className="mx-auto max-w-5xl px-4 py-8">
         <CharacterProfileHeader character={character} />
+
+        {/* Share link */}
+        <div className="mb-6 -mt-4">
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(window.location.href)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
+          >
+            {copied ? '✓ Link copied!' : 'Copy profile link'}
+          </button>
+        </div>
 
         {/* Stats section: Jobs / Crafting tabs + Status panel */}
         <section className="mb-8">

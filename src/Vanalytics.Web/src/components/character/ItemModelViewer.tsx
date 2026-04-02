@@ -2,9 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import { useFfxiFileSystem } from '../../context/FfxiFileSystemContext'
 import { parseDatFile, parseSkeletonDat, SKELETON_PATHS, modelToPath } from '../../lib/ffxi-dat'
 import type { ParsedMesh, ParsedTexture, ParsedSkeleton } from '../../lib/ffxi-dat'
-import { Settings, FolderOpen } from 'lucide-react'
+import { FolderOpen } from 'lucide-react'
 import ThreeModelViewer from './ThreeModelViewer'
-import { Link } from 'react-router-dom'
 
 const RACE_NAMES: Record<number, string> = {
   1: 'Hume Male', 2: 'Hume Female', 3: 'Elvaan Male', 4: 'Elvaan Female',
@@ -186,11 +185,10 @@ export default function ItemModelViewer({ itemId }: ItemModelViewerProps) {
         <h2 className="text-sm font-semibold text-gray-400 mb-3">3D Model</h2>
         <div className="flex items-center gap-2 text-sm text-gray-500">
           <FolderOpen className="h-4 w-4 shrink-0" />
-          <span>Configure your FFXI installation in</span>
-          <Link to="/profile" className="text-blue-400 hover:text-blue-300 inline-flex items-center gap-1">
-            <Settings className="h-3 w-3" /> Settings
-          </Link>
-          <span>to view 3D models</span>
+          <span>Connect your FFXI installation to view 3D models</span>
+          <button onClick={ffxi.configure} className="text-blue-400 hover:text-blue-300 text-sm font-medium">
+            Browse...
+          </button>
         </div>
       </div>
     )

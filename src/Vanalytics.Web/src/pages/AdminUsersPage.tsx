@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { api, ApiError } from '../api/client'
 import type { AdminUser, UserRole, CreateUserResponse } from '../types/api'
 import UserAvatar from '../components/UserAvatar'
+import ConfirmModal from '../components/ConfirmModal'
 import { useAuth } from '../context/AuthContext'
 import { X, Plus, Copy, Check } from 'lucide-react'
 
@@ -163,6 +164,7 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; username: string } | null>(null)
 
   const fetchUsers = async () => {
     try {
@@ -191,8 +193,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  const handleDelete = async (id: string, username: string) => {
-    if (!confirm(`Delete user "${username}"? This will remove all their characters and data.`)) return
+  const handleDelete = async (id: string) => {
     try {
       await api(`/api/admin/users/${id}`, { method: 'DELETE' })
       fetchUsers()
@@ -277,7 +278,7 @@ export default function AdminUsersPage() {
                 <td className="px-4 py-3 text-right">
                   {!u.isSystemAccount && u.role !== 'Admin' && (
                     <button
-                      onClick={() => handleDelete(u.id, u.username)}
+                      onClick={() => setPendingDelete({ id: u.id, username: u.username })}
                       className="text-xs text-red-400 hover:text-red-300"
                     >
                       Delete
@@ -298,6 +299,15 @@ export default function AdminUsersPage() {
         <CreateUserModal
           onClose={() => setShowCreate(false)}
           onCreated={fetchUsers}
+        />
+      )}
+
+      {pendingDelete && (
+        <ConfirmModal
+          message={`Delete user "${pendingDelete.username}"? This will remove all their characters and data.`}
+          confirmLabel="Delete"
+          onConfirm={() => { handleDelete(pendingDelete.id); setPendingDelete(null) }}
+          onCancel={() => setPendingDelete(null)}
         />
       )}
     </div>

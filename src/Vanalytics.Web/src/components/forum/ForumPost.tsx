@@ -5,6 +5,7 @@ import type { EnrichedPostResponse, PurgeResponse } from '../../types/api'
 import ForumAuthorBadge from './ForumAuthorBadge'
 import ForumVoteButton from './ForumVoteButton'
 import ForumEditor from './ForumEditor'
+import ConfirmModal from '../ConfirmModal'
 
 interface Props {
   post: EnrichedPostResponse
@@ -21,6 +22,8 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
   const [editing, setEditing] = useState(false)
   const [editBody, setEditBody] = useState(post.body ?? '')
   const [purging, setPurging] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showPurgeConfirm, setShowPurgeConfirm] = useState(false)
 
   const canEdit = (isAuthor || isModerator) && !post.isDeleted
   const canDelete = (isAuthor || isModerator) && !post.isDeleted
@@ -37,7 +40,6 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
   }
 
   const deletePost = async () => {
-    if (!confirm('Delete this post?')) return
     const endpoint = isModerator && !isAuthor
       ? `/api/forum/posts/${post.id}/moderate`
       : `/api/forum/posts/${post.id}`
@@ -46,10 +48,6 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
   }
 
   const purgePost = async () => {
-    const warning = isFirstPost
-      ? 'PURGE this post?\n\nThis is the first post in the thread. Purging it will permanently delete the ENTIRE THREAD and all its posts and attachments. This cannot be undone.'
-      : 'PURGE this post?\n\nThis will permanently delete this post and its attachments. This cannot be undone.'
-    if (!confirm(warning)) return
     setPurging(true)
     try {
       const result = await api<PurgeResponse>(`/api/forum/posts/${post.id}/purge`, { method: 'DELETE' })
@@ -70,7 +68,7 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
             <p className="text-gray-600 italic text-sm">[This post has been deleted]</p>
             {canPurge && (
               <button
-                onClick={purgePost}
+                onClick={() => setShowPurgeConfirm(true)}
                 disabled={purging}
                 className="text-gray-600 hover:text-red-500 p-1 disabled:opacity-50"
                 title="Purge permanently"
@@ -80,6 +78,20 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
             )}
           </div>
         </div>
+        {showPurgeConfirm && (
+          <ConfirmModal
+            message={
+              isFirstPost
+                ? 'This is the first post in the thread. Purging it will permanently delete the ENTIRE THREAD and all its posts and attachments.'
+                : 'Permanently delete this post and its attachments.'
+            }
+            confirmLabel="Purge"
+            variant="danger"
+            confirmText="PURGE"
+            onConfirm={() => { purgePost(); setShowPurgeConfirm(false) }}
+            onCancel={() => setShowPurgeConfirm(false)}
+          />
+        )}
       </div>
     )
   }
@@ -110,12 +122,12 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
                 </button>
               )}
               {canDelete && (
-                <button onClick={deletePost} className="text-gray-600 hover:text-red-400 p-1" title="Delete">
+                <button onClick={() => setShowDeleteConfirm(true)} className="text-gray-600 hover:text-red-400 p-1" title="Delete">
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
               )}
               {canPurge && (
-                <button onClick={purgePost} disabled={purging} className="text-gray-600 hover:text-red-500 p-1 disabled:opacity-50" title="Purge permanently">
+                <button onClick={() => setShowPurgeConfirm(true)} disabled={purging} className="text-gray-600 hover:text-red-500 p-1 disabled:opacity-50" title="Purge permanently">
                   <Flame className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -123,6 +135,28 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
           </>
         )}
       </div>
+      {showDeleteConfirm && (
+        <ConfirmModal
+          message="Delete this post?"
+          confirmLabel="Delete"
+          onConfirm={() => { deletePost(); setShowDeleteConfirm(false) }}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+      {showPurgeConfirm && (
+        <ConfirmModal
+          message={
+            isFirstPost
+              ? 'This is the first post in the thread. Purging it will permanently delete the ENTIRE THREAD and all its posts and attachments.'
+              : 'Permanently delete this post and its attachments.'
+          }
+          confirmLabel="Purge"
+          variant="danger"
+          confirmText="PURGE"
+          onConfirm={() => { purgePost(); setShowPurgeConfirm(false) }}
+          onCancel={() => setShowPurgeConfirm(false)}
+        />
+      )}
     </div>
   )
 }
