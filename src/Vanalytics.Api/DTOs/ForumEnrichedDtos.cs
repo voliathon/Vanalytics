@@ -1,8 +1,15 @@
+using Soverance.Forum.DTOs;
+
 namespace Vanalytics.Api.DTOs;
+
+public record QuotedPostInfo(
+    long Id, string AuthorUsername, string? AuthorDisplayName,
+    string Body, bool IsDeleted);
 
 public record EnrichedPostResponse(
     long Id, Guid AuthorId, string? Body, bool IsEdited, bool IsDeleted,
-    int VoteCount, bool CurrentUserVoted,
+    ReactionSummary Reactions, string[] UserReactions,
+    long? ReplyToPostId, QuotedPostInfo? QuotedPost,
     DateTimeOffset CreatedAt, DateTimeOffset? UpdatedAt,
     string AuthorUsername, string? AuthorDisplayName, string? AuthorAvatarHash, int AuthorPostCount, DateTimeOffset AuthorJoinedAt);
 

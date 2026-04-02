@@ -121,9 +121,9 @@ public partial class ForumSearchService : IForumSearchService
             .Select(g => new { ThreadId = g.Key, Count = g.Count() - 1 })
             .ToListAsync();
 
-        var voteCounts = await _db.Set<ForumVote>()
-            .Where(v => threadIds.Contains(v.Post.ThreadId))
-            .GroupBy(v => v.Post.ThreadId)
+        var voteCounts = await _db.Set<Soverance.Forum.Models.ForumReaction>()
+            .Where(r => threadIds.Contains(r.Post.ThreadId))
+            .GroupBy(r => r.Post.ThreadId)
             .Select(g => new { ThreadId = g.Key, Count = g.Count() })
             .ToListAsync();
 
@@ -218,9 +218,9 @@ public partial class ForumSearchService : IForumSearchService
             .Select(g => new { ThreadId = g.Key, Count = g.Count() - 1 })
             .ToListAsync();
 
-        var voteCounts = await _db.Set<ForumVote>()
-            .Where(v => pageThreadIds.Contains(v.Post.ThreadId))
-            .GroupBy(v => v.Post.ThreadId)
+        var voteCounts = await _db.Set<Soverance.Forum.Models.ForumReaction>()
+            .Where(r => pageThreadIds.Contains(r.Post.ThreadId))
+            .GroupBy(r => r.Post.ThreadId)
             .Select(g => new { ThreadId = g.Key, Count = g.Count() })
             .ToListAsync();
 

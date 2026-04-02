@@ -124,12 +124,48 @@ public class ForumController : ControllerBase
         var authorIds = posts.Select(p => p.AuthorId).Distinct();
         var authors = await _authors.ResolveAuthorsAsync(authorIds);
 
+        // Resolve quoted posts for replies
+        var replyToIds = posts
+            .Where(p => p.ReplyToPostId.HasValue)
+            .Select(p => p.ReplyToPostId!.Value)
+            .Distinct()
+            .ToList();
+
+        var quotedPosts = new Dictionary<long, QuotedPostInfo>();
+        if (replyToIds.Count > 0)
+        {
+            var db = HttpContext.RequestServices.GetRequiredService<VanalyticsDbContext>();
+            var quotedRaw = await db.Set<Soverance.Forum.Models.ForumPost>()
+                .Where(p => replyToIds.Contains(p.Id))
+                .Select(p => new { p.Id, p.AuthorId, p.Body, p.IsDeleted })
+                .ToListAsync();
+
+            var quotedAuthorIds = quotedRaw.Select(q => q.AuthorId).Distinct();
+            var quotedAuthors = await _authors.ResolveAuthorsAsync(quotedAuthorIds);
+
+            foreach (var q in quotedRaw)
+            {
+                var qAuthor = quotedAuthors.GetValueOrDefault(q.AuthorId);
+                var body = q.IsDeleted ? "" : (q.Body.Length > 300 ? q.Body[..300] + "..." : q.Body);
+                quotedPosts[q.Id] = new QuotedPostInfo(
+                    q.Id,
+                    qAuthor?.Username ?? "[deleted]",
+                    qAuthor?.DisplayName,
+                    body,
+                    q.IsDeleted);
+            }
+        }
+
         var enriched = posts.Select(p =>
         {
             var author = authors.GetValueOrDefault(p.AuthorId);
+            QuotedPostInfo? quoted = p.ReplyToPostId.HasValue
+                ? quotedPosts.GetValueOrDefault(p.ReplyToPostId.Value)
+                : null;
             return new EnrichedPostResponse(
                 p.Id, p.AuthorId, p.Body, p.IsEdited, p.IsDeleted,
-                p.VoteCount, p.CurrentUserVoted,
+                p.Reactions, p.UserReactions,
+                p.ReplyToPostId, quoted,
                 p.CreatedAt, p.UpdatedAt,
                 author?.Username ?? "[deleted]",
                 author?.DisplayName,
@@ -185,8 +221,18 @@ public class ForumController : ControllerBase
         if (CountForumImages(request.Body) > MaxImagesPerPost)
             return BadRequest(new { error = $"Posts cannot contain more than {MaxImagesPerPost} images." });
 
+        // Validate replyToPostId if provided (must exist and belong to same thread)
+        if (request.ReplyToPostId.HasValue)
+        {
+            var db = HttpContext.RequestServices.GetRequiredService<VanalyticsDbContext>();
+            var replyTargetExists = await db.Set<Soverance.Forum.Models.ForumPost>()
+                .AnyAsync(p => p.Id == request.ReplyToPostId.Value && p.ThreadId == threadId);
+            if (!replyTargetExists)
+                return BadRequest(new { error = "Quoted post not found or does not belong to this thread." });
+        }
+
         var sanitizedBody = SanitizeImageSources(request.Body);
-        var sanitizedRequest = new CreatePostRequest(sanitizedBody);
+        var sanitizedRequest = new CreatePostRequest(sanitizedBody, request.ReplyToPostId);
 
         var post = await _forum.CreatePostAsync(threadId, sanitizedRequest, GetUserId());
         if (post == null) return Conflict(new { error = "Thread not found or is locked." });
@@ -274,15 +320,27 @@ public class ForumController : ControllerBase
         return Ok(new { id = attachment.Id, url });
     }
 
-    // === Voting (Authenticated) ===
+    // === Reactions (Authenticated) ===
 
     [Authorize]
-    [HttpPost("posts/{postId}/vote")]
-    public async Task<IActionResult> ToggleVote(long postId)
+    [HttpPost("posts/{postId}/react")]
+    public async Task<IActionResult> ToggleReaction(long postId, [FromBody] ReactRequest request)
     {
-        var (count, voted) = await _forum.ToggleVoteAsync(postId, GetUserId());
-        return Ok(new { voteCount = count, userVoted = voted });
+        if (string.IsNullOrWhiteSpace(request.ReactionType))
+            return BadRequest(new { error = "reactionType is required." });
+
+        try
+        {
+            var (reactions, userReactions) = await _forum.ToggleReactionAsync(postId, GetUserId(), request.ReactionType);
+            return Ok(new { reactions, userReactions });
+        }
+        catch (ArgumentException)
+        {
+            return BadRequest(new { error = "Invalid reaction type. Valid types: like, thanks, funny." });
+        }
     }
+
+    public record ReactRequest(string ReactionType);
 
     // === Categories (Moderator+) ===
 

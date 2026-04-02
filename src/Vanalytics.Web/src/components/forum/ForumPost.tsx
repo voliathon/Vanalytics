@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Pencil, Trash2, Flame } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Pencil, Trash2, Flame, Quote } from 'lucide-react'
 import { api } from '../../api/client'
 import type { EnrichedPostResponse, PurgeResponse } from '../../types/api'
 import ForumAuthorBadge from './ForumAuthorBadge'
-import ForumVoteButton from './ForumVoteButton'
+import ForumReactionBar from './ForumReactionBar'
 import ForumEditor from './ForumEditor'
 import ConfirmModal from '../ConfirmModal'
 
@@ -16,9 +17,10 @@ interface Props {
   isAuthenticated: boolean
   onUpdated: () => void
   onPurged: (threadDeleted: boolean) => void
+  onQuote?: (postId: number, username: string) => void
 }
 
-export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, isAdmin, isAuthenticated, onUpdated, onPurged }: Props) {
+export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, isAdmin, isAuthenticated, onUpdated, onPurged, onQuote }: Props) {
   const [editing, setEditing] = useState(false)
   const [editBody, setEditBody] = useState(post.body ?? '')
   const [purging, setPurging] = useState(false)
@@ -61,7 +63,7 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
 
   if (post.isDeleted) {
     return (
-      <div className="flex gap-4 rounded-lg border border-gray-800/50 bg-gray-900/30 p-4">
+      <div id={`post-${post.id}`} className="flex gap-4 rounded-lg border border-gray-800/50 bg-gray-900/30 p-4">
         <ForumAuthorBadge username={post.authorUsername} displayName={post.authorDisplayName} postCount={post.authorPostCount} joinedAt={post.authorJoinedAt} />
         <div className="flex-1">
           <div className="flex items-center justify-between">
@@ -97,7 +99,7 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
   }
 
   return (
-    <div className="flex gap-4 rounded-lg border border-gray-800 bg-gray-900 p-4">
+    <div id={`post-${post.id}`} className="flex gap-4 rounded-lg border border-gray-800 bg-gray-900 p-4">
       <ForumAuthorBadge username={post.authorUsername} displayName={post.authorDisplayName} postCount={post.authorPostCount} joinedAt={post.authorJoinedAt} />
       <div className="flex-1 min-w-0">
         {editing ? (
@@ -110,9 +112,34 @@ export default function ForumPost({ post, isFirstPost, isAuthor, isModerator, is
           </div>
         ) : (
           <>
+            {post.quotedPost && (
+              <div
+                className="border-l-2 border-gray-600 bg-gray-800/50 rounded-r px-3 py-2 mb-2 cursor-pointer hover:bg-gray-800/70 transition-colors"
+                onClick={() => {
+                  const el = document.getElementById(`post-${post.quotedPost!.id}`)
+                  el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                }}
+              >
+                <Link to={`/users/${post.quotedPost.authorUsername}`} className="text-xs font-medium text-gray-400 hover:underline" onClick={e => e.stopPropagation()}>{post.quotedPost.authorDisplayName ?? post.quotedPost.authorUsername}</Link>
+                {post.quotedPost.isDeleted ? (
+                  <p className="text-xs text-gray-600 italic">[This post has been deleted]</p>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-3">{post.quotedPost.body}</p>
+                )}
+              </div>
+            )}
             <ForumEditor content={post.body ?? ''} editable={false} />
             <div className="flex items-center gap-3 mt-3">
-              <ForumVoteButton postId={post.id} voteCount={post.voteCount} userVoted={post.currentUserVoted} disabled={!isAuthenticated} />
+              <ForumReactionBar postId={post.id} reactions={post.reactions} userReactions={post.userReactions} disabled={!isAuthenticated} />
+              {isAuthenticated && onQuote && (
+                <button
+                  onClick={() => onQuote(post.id, post.authorDisplayName ?? post.authorUsername)}
+                  className="text-gray-600 hover:text-gray-300 p-1"
+                  title="Quote"
+                >
+                  <Quote className="h-3.5 w-3.5" />
+                </button>
+              )}
               <span className="text-xs text-gray-600">{new Date(post.createdAt).toLocaleString()}</span>
               {post.isEdited && <span className="text-xs text-gray-600 italic">edited</span>}
               <div className="flex-1" />
