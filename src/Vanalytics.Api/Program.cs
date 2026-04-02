@@ -311,8 +311,8 @@ app.MapGet("/health", async (VanalyticsDbContext db, IHostEnvironment env) =>
     }, statusCode: dbHealthy ? 200 : 503);
 });
 
-// SPA fallback: serve index.html for unmatched non-file, non-API requests
-app.MapFallbackToFile("index.html");
+// SPA fallback: serve index.html with injected OpenGraph meta tags
+app.UseMiddleware<OpenGraphMiddleware>();
 
 app.Run();
 
