@@ -241,14 +241,30 @@ export interface ThreadDetailResponse {
   authorAvatarHash: string | null
 }
 
+export interface ReactionSummary {
+  like: number
+  thanks: number
+  funny: number
+}
+
+export interface QuotedPostInfo {
+  id: number
+  authorUsername: string
+  authorDisplayName: string | null
+  body: string
+  isDeleted: boolean
+}
+
 export interface EnrichedPostResponse {
   id: number
   authorId: string
   body: string | null
   isEdited: boolean
   isDeleted: boolean
-  voteCount: number
-  currentUserVoted: boolean
+  reactions: ReactionSummary
+  userReactions: string[]
+  replyToPostId: number | null
+  quotedPost: QuotedPostInfo | null
   createdAt: string
   updatedAt: string | null
   authorUsername: string
@@ -292,6 +308,33 @@ export interface PaginatedSearchResults {
 
 export interface PurgeResponse {
   threadDeleted: boolean
+}
+
+// User profiles
+export interface UserRecentPost {
+  postId: number
+  threadTitle: string
+  categorySlug: string
+  threadSlug: string
+  createdAt: string
+  bodyPreview: string
+}
+
+export interface UserPublicCharacter {
+  name: string
+  server: string
+  activeJob: string | null
+  activeJobLevel: number
+}
+
+export interface UserProfileResponse {
+  username: string
+  displayName: string | null
+  avatarUrl: string | null
+  joinedAt: string
+  postCount: number
+  recentPosts: UserRecentPost[]
+  publicCharacters: UserPublicCharacter[]
 }
 
 // Admin

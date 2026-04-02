@@ -30,6 +30,7 @@ export default function ForumThreadPage() {
   const [error, setError] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showPurgeConfirm, setShowPurgeConfirm] = useState(false)
+  const [replyTo, setReplyTo] = useState<{ postId: number; username: string } | null>(null)
 
   useEffect(() => {
     if (!categorySlug || !threadSlug) return
@@ -130,6 +131,7 @@ export default function ForumThreadPage() {
   }
 
   const onPostCreated = () => {
+    setReplyTo(null)
     if (thread) fetchPosts(thread.id)
   }
 
@@ -143,6 +145,11 @@ export default function ForumThreadPage() {
     } else {
       if (thread) fetchPosts(thread.id)
     }
+  }
+
+  const handleQuote = (postId: number, username: string) => {
+    setReplyTo({ postId, username })
+    document.querySelector('[data-reply-box]')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 
   if (loadingThread) {
@@ -277,6 +284,7 @@ export default function ForumThreadPage() {
               isAuthenticated={user !== null}
               onUpdated={onPostCreated}
               onPurged={handlePurged}
+              onQuote={handleQuote}
             />
           ))}
         </div>
@@ -301,7 +309,15 @@ export default function ForumThreadPage() {
         ) : thread.isLocked ? (
           <p className="text-center text-amber-400 text-sm py-4">This thread is locked.</p>
         ) : user ? (
-          <ForumReplyBox threadId={thread.id} onPostCreated={onPostCreated} />
+          <div data-reply-box>
+            <ForumReplyBox
+              threadId={thread.id}
+              onPostCreated={onPostCreated}
+              replyToPostId={replyTo?.postId}
+              replyToUsername={replyTo?.username}
+              onClearReply={() => setReplyTo(null)}
+            />
+          </div>
         ) : (
           <p className="text-center text-gray-500 text-sm py-4">
             <Link to="/login" className="text-blue-400 hover:text-blue-300">Sign in</Link>
