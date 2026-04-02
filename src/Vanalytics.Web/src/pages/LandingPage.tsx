@@ -1,8 +1,42 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { useLoginModal, LoginModalProvider } from '../context/LoginModalContext'
 import LoginModal from '../components/LoginModal'
+
+function LazyVideo({ src, className }: { src: string; className?: string }) {
+  const ref = useRef<HTMLVideoElement>(null)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '200px' },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <video
+      ref={ref}
+      src={visible ? src : undefined}
+      autoPlay
+      loop
+      muted
+      playsInline
+      preload="none"
+      className={className}
+    />
+  )
+}
 
 const features = [
   {
@@ -96,12 +130,8 @@ function LandingContent() {
             >
               <div className={`w-full lg:w-1/2 ${imageLeft ? '' : 'lg:order-2'}`}>
                 {feature.type === 'video' ? (
-                  <video
+                  <LazyVideo
                     src={feature.media}
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
                     className="w-full rounded-lg border border-gray-800"
                   />
                 ) : (
@@ -109,6 +139,7 @@ function LandingContent() {
                     <img
                       src={feature.media}
                       alt={feature.title}
+                      loading="lazy"
                       className="w-full rounded-lg border border-gray-800"
                       onError={(e) => {
                         const target = e.currentTarget
