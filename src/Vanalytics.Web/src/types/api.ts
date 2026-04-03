@@ -781,3 +781,13 @@ export interface ZoneSpawnDto {
   maxLevel: number
   isMonster: boolean | null
 }
+
+export interface PlayerListItem {
+  name: string
+  server: string
+  job: string | null
+  level: number | null
+  race: string | null
+  linkshell: string | null
+  lastSyncedAt: string | null
+}
