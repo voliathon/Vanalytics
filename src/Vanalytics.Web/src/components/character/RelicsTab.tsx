@@ -73,7 +73,11 @@ export default function RelicsTab({ characterId }: Props) {
   const hoveredDetail = hoveredItemId ? itemDetailCache.get(hoveredItemId) ?? null : null
 
   if (loading) return <p className="text-gray-400">Loading...</p>
-  if (!data) return <p className="text-gray-400">No relic data available.</p>
+  if (!data) return (
+    <p className="text-gray-400">
+      No relic data available. Ultimate weapon progress is tracked from your inventory history — keep syncing to build your timeline.
+    </p>
+  )
 
   const sortedProgress = [...data.progress].sort(
     (a, b) => CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category)

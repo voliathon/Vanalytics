@@ -1,28 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { api, ApiError } from '../api/client'
 import type { VanadielClockData } from '../types/api'
-
-const elementColors: Record<string, string> = {
-  Fire: 'text-red-400',
-  Earth: 'text-yellow-600',
-  Water: 'text-blue-400',
-  Wind: 'text-green-400',
-  Ice: 'text-cyan-300',
-  Lightning: 'text-purple-400',
-  Light: 'text-yellow-200',
-  Dark: 'text-gray-400',
-}
-
-const elementBg: Record<string, string> = {
-  Fire: 'bg-red-900/30 border-red-800',
-  Earth: 'bg-yellow-900/30 border-yellow-800',
-  Water: 'bg-blue-900/30 border-blue-800',
-  Wind: 'bg-green-900/30 border-green-800',
-  Ice: 'bg-cyan-900/30 border-cyan-800',
-  Lightning: 'bg-purple-900/30 border-purple-800',
-  Light: 'bg-yellow-900/20 border-yellow-700',
-  Dark: 'bg-gray-800/50 border-gray-700',
-}
+import { elementTextColors, elementBgColors, type Element } from '../lib/vanadiel'
 
 const moonIcons: Record<string, string> = {
   'New Moon': '\u{1F311}',
@@ -80,7 +59,8 @@ export default function VanadielClockPage() {
     return <p className="text-gray-400">{error || 'Loading Vana\'diel clock...'}</p>
   }
 
-  const { time, dayOfWeek, element, moon, conquest, guilds, ferry, rse } = clock
+  const { time, dayOfWeek, element: elementRaw, moon, conquest, guilds, ferry, rse } = clock
+  const element = elementRaw as Element
 
   return (
     <div>
@@ -106,9 +86,9 @@ export default function VanadielClockPage() {
         </div>
 
         {/* Day of the Week */}
-        <div className={`rounded-lg border p-5 ${elementBg[element] ?? 'border-gray-800 bg-gray-900'}`}>
+        <div className={`rounded-lg border p-5 ${elementBgColors[element] ?? 'border-gray-800 bg-gray-900'}`}>
           <h2 className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Day of the Week</h2>
-          <p className={`text-3xl font-bold ${elementColors[element] ?? 'text-gray-200'}`}>
+          <p className={`text-3xl font-bold ${elementTextColors[element] ?? 'text-gray-200'}`}>
             {dayOfWeek}
           </p>
           <p className="text-sm text-gray-400 mt-1">
@@ -164,7 +144,7 @@ export default function VanadielClockPage() {
                     <td className="px-3 py-2 text-gray-400">
                       {pad(g.openHour)}:00 – {pad(g.closeHour)}:00
                     </td>
-                    <td className={`px-3 py-2 ${elementColors[dayOfWeek === g.holiday ? element : ''] ?? 'text-gray-400'}`}>
+                    <td className={`px-3 py-2 ${dayOfWeek === g.holiday ? elementTextColors[element] : 'text-gray-400'}`}>
                       {g.holiday}
                     </td>
                     <td className="px-3 py-2">

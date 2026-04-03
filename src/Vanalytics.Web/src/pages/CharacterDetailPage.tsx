@@ -247,7 +247,8 @@ export default function CharacterDetailPage() {
             {macroError && <div className="text-red-400 text-sm mb-2">{macroError}</div>}
             {macroBooks.length === 0 && !macroError ? (
               <div className="text-gray-500 text-sm py-4">
-                No macro data synced yet. Use the Windower addon to sync your macros.
+                No macro data synced yet. Macros sync automatically from your Windower addon — view and edit them here once synced.{' '}
+                <Link to="/setup?tab=macros" className="text-blue-400 hover:underline">Learn more</Link>
               </div>
             ) : (
               <>
