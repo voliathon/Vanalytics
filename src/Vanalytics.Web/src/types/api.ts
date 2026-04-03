@@ -782,6 +782,18 @@ export interface ZoneSpawnDto {
   isMonster: boolean | null
 }
 
+export interface ItemOwnerEntry {
+  name: string
+  server: string
+  job: string | null
+  level: number | null
+}
+
+export interface ItemOwnersResponse {
+  equipped: ItemOwnerEntry[]
+  inventory: ItemOwnerEntry[]
+}
+
 export interface PlayerListItem {
   name: string
   server: string
