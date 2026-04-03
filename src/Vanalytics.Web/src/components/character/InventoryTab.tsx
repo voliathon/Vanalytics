@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { InventoryByBag, InventoryItem, GameItemDetail } from '../../types/api'
 import ItemPreviewBox from '../economy/ItemPreviewBox'
@@ -175,7 +176,12 @@ export default function InventoryTab({ characterId }: Props) {
 
   if (loading) return <p className="text-gray-400 py-4">Loading inventory...</p>
   if (!inventory || availableBags.length === 0) {
-    return <p className="text-gray-400 py-4">No inventory data yet.</p>
+    return (
+      <p className="text-gray-400 py-4">
+        No inventory data yet. Inventory syncs automatically each time your Windower addon runs.{' '}
+        <Link to="/setup?tab=inventory" className="text-blue-400 hover:underline">Learn more</Link>
+      </p>
+    )
   }
 
   const renderRow = (item: InventoryItem & { bag?: string }, key: string, showBag?: boolean) => (

@@ -29,6 +29,7 @@ import ForumThreadPage from './pages/ForumThreadPage'
 import ForumNewThreadPage from './pages/ForumNewThreadPage'
 import ForumSearchPage from './pages/ForumSearchPage'
 import UserProfilePage from './pages/UserProfilePage'
+import PlayerDirectoryPage from './pages/PlayerDirectoryPage'
 
 
 function SamlCodeHandler() {
@@ -133,6 +134,7 @@ export default function App() {
             <Route path="/forum/:categorySlug/new" element={<ProtectedRoute><ForumNewThreadPage /></ProtectedRoute>} />
             <Route path="/forum/:categorySlug/:threadSlug" element={<ForumThreadPage />} />
             <Route path="/users/:username" element={<UserProfilePage />} />
+            <Route path="/players" element={<PlayerDirectoryPage />} />
           </Route>
 
           {/* Public: shareable character profiles (MUST be after explicit routes) */}

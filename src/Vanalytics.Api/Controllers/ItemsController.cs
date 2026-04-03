@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Vanalytics.Api.DTOs;
 using Vanalytics.Core.DTOs.Characters;
 using Vanalytics.Core.Models;
 using Vanalytics.Data;
@@ -435,6 +436,59 @@ public class ItemsController : ControllerBase
             .ToListAsync();
 
         return Ok(listings);
+    }
+
+    [HttpGet("{id:int}/owners")]
+    public async Task<IActionResult> GetItemOwners(int id)
+    {
+        // Characters who have this item equipped
+        var equippedChars = await _db.EquippedGear
+            .Where(g => g.ItemId == id)
+            .Select(g => g.Character)
+            .Where(c => c.IsPublic)
+            .Distinct()
+            .Select(c => new ItemOwnerEntry
+            {
+                Name = c.Name,
+                Server = c.Server,
+                Job = c.Jobs.Where(j => j.IsActive).Select(j => j.JobId.ToString()).FirstOrDefault(),
+                Level = c.Jobs.Where(j => j.IsActive).Select(j => (int?)j.Level).FirstOrDefault(),
+            })
+            .OrderBy(e => e.Name)
+            .ToListAsync();
+
+        // For Rare/Ex items, also check inventory
+        var inventoryChars = new List<ItemOwnerEntry>();
+        var gameItem = await _db.GameItems.FindAsync(id);
+        if (gameItem is { IsRare: true } or { IsExclusive: true })
+        {
+            var equippedNames = equippedChars.Select(e => e.Name + e.Server).ToHashSet();
+            inventoryChars = await _db.CharacterInventories
+                .Where(i => i.ItemId == id)
+                .Select(i => i.Character)
+                .Where(c => c.IsPublic)
+                .Distinct()
+                .Select(c => new ItemOwnerEntry
+                {
+                    Name = c.Name,
+                    Server = c.Server,
+                    Job = c.Jobs.Where(j => j.IsActive).Select(j => j.JobId.ToString()).FirstOrDefault(),
+                    Level = c.Jobs.Where(j => j.IsActive).Select(j => (int?)j.Level).FirstOrDefault(),
+                })
+                .OrderBy(e => e.Name)
+                .ToListAsync();
+
+            // Remove characters already in the equipped list
+            inventoryChars = inventoryChars
+                .Where(i => !equippedNames.Contains(i.Name + i.Server))
+                .ToList();
+        }
+
+        return Ok(new ItemOwnersResponse
+        {
+            Equipped = equippedChars,
+            Inventory = inventoryChars,
+        });
     }
 
     private static readonly Dictionary<string, Expression<Func<GameItem, int?>>> StatExpressions = new(StringComparer.OrdinalIgnoreCase)

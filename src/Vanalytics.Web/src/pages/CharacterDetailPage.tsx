@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import type { CharacterDetail, GearEntry, GameItemSummary, GameItemDetail } from '../types/api'
 import { listMacroBooks, getMacroBook, updateMacroBook } from '../api/macros'
 import type { MacroBookSummary, MacroBookDetail } from '../api/macros'
+import LoadingSpinner from '../components/LoadingSpinner'
 import JobsGrid from '../components/JobsGrid'
 import CraftingTable from '../components/CraftingTable'
 import ModelViewer from '../components/character/ModelViewer'
@@ -144,7 +145,7 @@ export default function CharacterDetailPage() {
     }
   }
 
-  if (loading) return <p className="text-gray-400">Loading...</p>
+  if (loading) return <LoadingSpinner />
   if (!character) return <p className="text-red-400">Character not found.</p>
 
   return (
@@ -247,7 +248,8 @@ export default function CharacterDetailPage() {
             {macroError && <div className="text-red-400 text-sm mb-2">{macroError}</div>}
             {macroBooks.length === 0 && !macroError ? (
               <div className="text-gray-500 text-sm py-4">
-                No macro data synced yet. Use the Windower addon to sync your macros.
+                No macro data synced yet. Macros sync automatically from your Windower addon — view and edit them here once synced.{' '}
+                <Link to="/setup?tab=macros" className="text-blue-400 hover:underline">Learn more</Link>
               </div>
             ) : (
               <>
