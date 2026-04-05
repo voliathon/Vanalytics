@@ -7,11 +7,32 @@ interface InventoryAnomalyBannerProps {
 }
 
 const BAG_OPTIONS = [
-  'Inventory', 'Safe', 'Storage', 'Locker',
+  'Inventory', 'Safe', 'Safe2', 'Storage', 'Locker',
   'Satchel', 'Sack', 'Case',
   'Wardrobe', 'Wardrobe2', 'Wardrobe3', 'Wardrobe4',
   'Wardrobe5', 'Wardrobe6', 'Wardrobe7', 'Wardrobe8',
 ]
+
+const BAG_LABELS: Record<string, string> = {
+  Inventory: 'Inventory',
+  Safe: 'Mog Safe',
+  Safe2: 'Mog Safe 2',
+  Storage: 'Storage',
+  Locker: 'Mog Locker',
+  Satchel: 'Mog Satchel',
+  Sack: 'Mog Sack',
+  Case: 'Mog Case',
+  Wardrobe: 'Mog Wardrobe 1',
+  Wardrobe2: 'Mog Wardrobe 2',
+  Wardrobe3: 'Mog Wardrobe 3',
+  Wardrobe4: 'Mog Wardrobe 4',
+  Wardrobe5: 'Mog Wardrobe 5',
+  Wardrobe6: 'Mog Wardrobe 6',
+  Wardrobe7: 'Mog Wardrobe 7',
+  Wardrobe8: 'Mog Wardrobe 8',
+}
+
+const bagLabel = (key: string) => BAG_LABELS[key] ?? key
 
 export default function InventoryAnomalyBanner({ characterId }: InventoryAnomalyBannerProps) {
   const [data, setData] = useState<AnomalyResponse | null>(null)
@@ -91,7 +112,7 @@ export default function InventoryAnomalyBanner({ characterId }: InventoryAnomaly
             {data.pendingMoves.map((m) => (
               <div key={m.id} className="flex items-center justify-between text-sm">
                 <span className="text-gray-300">
-                  {m.itemName}: {m.fromBag}:{m.fromSlot} → {m.toBag} (x{m.quantity})
+                  {m.itemName}: {bagLabel(m.fromBag)}:{m.fromSlot} → {bagLabel(m.toBag)} (x{m.quantity})
                 </span>
                 <button
                   onClick={() => handleCancelMove(m.id)}
@@ -158,7 +179,7 @@ function AnomalyCard({ anomaly, overrideBag, onOverrideBag, onResolve, onDismiss
     return (
       <div className="flex items-center justify-between text-sm border-b border-amber-900/50 pb-2">
         <span className="text-gray-300">
-          <span className="text-amber-400 font-medium">{anomaly.details.bagName}</span>: {anomaly.details.usedSlots}/{anomaly.details.maxSlots} slots used ({Math.round((anomaly.details.usedSlots! / anomaly.details.maxSlots!) * 100)}%)
+          <span className="text-amber-400 font-medium">{bagLabel(anomaly.details.bagName ?? '')}</span>: {anomaly.details.usedSlots}/{anomaly.details.maxSlots} slots used ({Math.round((anomaly.details.usedSlots! / anomaly.details.maxSlots!) * 100)}%)
         </span>
         <button onClick={onDismiss} className="text-xs text-gray-500 hover:text-gray-400">Dismiss</button>
       </div>
@@ -178,7 +199,7 @@ function AnomalyCard({ anomaly, overrideBag, onOverrideBag, onResolve, onDismiss
             {anomaly.details.slots?.map((s, i) => (
               <span key={i}>
                 {i > 0 && ', '}
-                {s.bag} slot {s.slotIndex} (x{s.quantity})
+                {bagLabel(s.bag)} slot {s.slotIndex} (x{s.quantity})
               </span>
             ))}
           </div>
@@ -202,7 +223,7 @@ function AnomalyCard({ anomaly, overrideBag, onOverrideBag, onResolve, onDismiss
             className="text-xs bg-gray-800 border border-gray-700 rounded px-2 py-1 text-gray-300"
           >
             {BAG_OPTIONS.map((b) => (
-              <option key={b} value={b}>{b}</option>
+              <option key={b} value={b}>{bagLabel(b)}</option>
             ))}
           </select>
           <button

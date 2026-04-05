@@ -91,6 +91,7 @@ export interface CharacterDetail {
   jobs: JobEntry[]
   gear: GearEntry[]
   craftingSkills: CraftingEntry[]
+  skills: SkillEntry[]
   favoriteAnimation?: { category: string; animationName: string; motionIndex: number }
 }
 
@@ -107,6 +108,12 @@ export interface GearEntry {
   slot: string
   itemId: number
   itemName: string
+}
+
+export interface SkillEntry {
+  skill: string
+  level: number
+  cap: number
 }
 
 export interface CraftingEntry {

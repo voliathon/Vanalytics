@@ -118,6 +118,54 @@ local craft_skill_ids = {
     [57] = 'Synergy',
 }
 
+-----------------------------------------------------------------------
+-- Combat, magic, and automaton skill ID maps
+-----------------------------------------------------------------------
+local combat_skill_ids = {
+    [1]  = 'HandToHand',
+    [2]  = 'Dagger',
+    [3]  = 'Sword',
+    [4]  = 'GreatSword',
+    [5]  = 'Axe',
+    [6]  = 'GreatAxe',
+    [7]  = 'Scythe',
+    [8]  = 'Polearm',
+    [9]  = 'Katana',
+    [10] = 'GreatKatana',
+    [11] = 'Club',
+    [12] = 'Staff',
+    [25] = 'Archery',
+    [26] = 'Marksmanship',
+    [27] = 'Throwing',
+    [28] = 'Guard',
+    [29] = 'Evasion',
+    [30] = 'Shield',
+    [31] = 'Parrying',
+}
+
+local magic_skill_ids = {
+    [32] = 'DivineMagic',
+    [33] = 'HealingMagic',
+    [34] = 'EnhancingMagic',
+    [35] = 'EnfeeblingMagic',
+    [36] = 'ElementalMagic',
+    [37] = 'DarkMagic',
+    [38] = 'SummoningMagic',
+    [39] = 'Ninjutsu',
+    [40] = 'Singing',
+    [41] = 'StringedInstrument',
+    [42] = 'WindInstrument',
+    [43] = 'BlueMagic',
+    [44] = 'Geomancy',
+    [45] = 'Handbell',
+}
+
+local automaton_skill_ids = {
+    [22] = 'AutomatonMelee',
+    [23] = 'AutomatonArchery',
+    [24] = 'AutomatonMagic',
+}
+
 local function get_craft_rank(level)
     if level == 0 then return 'Amateur'
     elseif level < 10 then return 'Recruit'
@@ -702,6 +750,36 @@ local function read_character_state()
         end
     end
 
+    -- Collect combat, magic, and automaton skills
+    local skills = {}
+    if player.skills then
+        local all_skill_ids = {}
+        for id, name in pairs(combat_skill_ids) do all_skill_ids[id] = name end
+        for id, name in pairs(magic_skill_ids) do all_skill_ids[id] = name end
+        for id, name in pairs(automaton_skill_ids) do all_skill_ids[id] = name end
+
+        for skill_id, skill_name in pairs(all_skill_ids) do
+            local skill = player.skills[skill_id]
+            if skill then
+                local level = 0
+                local cap = 0
+                if type(skill) == 'table' then
+                    level = skill.level or 0
+                    cap = skill.cap or 0
+                else
+                    level = tonumber(skill) or 0
+                end
+                if level > 0 then
+                    table.insert(skills, {
+                        skill = skill_name,
+                        level = level,
+                        cap = cap,
+                    })
+                end
+            end
+        end
+    end
+
     -- Collect merit points (only non-zero values to keep payload small)
     local merits = nil
     if player.merits then
@@ -738,6 +816,7 @@ local function read_character_state()
         jobs = jobs,
         gear = gear,
         crafting = crafting,
+        skills = skills,
     }
 
     -- Read mob entity for race and model data

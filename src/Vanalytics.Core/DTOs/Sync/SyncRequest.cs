@@ -73,6 +73,7 @@ public class SyncRequest
     public List<SyncJobEntry> Jobs { get; set; } = [];
     public List<SyncGearEntry> Gear { get; set; } = [];
     public List<SyncCraftingEntry> Crafting { get; set; } = [];
+    public List<SyncSkillEntry> Skills { get; set; } = [];
 }
 
 public class SyncJobEntry
@@ -96,4 +97,11 @@ public class SyncCraftingEntry
     public string Craft { get; set; } = string.Empty;
     public int Level { get; set; }
     public string Rank { get; set; } = string.Empty;
+}
+
+public class SyncSkillEntry
+{
+    public string Skill { get; set; } = string.Empty;
+    public int Level { get; set; }
+    public int Cap { get; set; }
 }

@@ -22,6 +22,7 @@ public class ProfilesController : ControllerBase
             .Include(c => c.Jobs)
             .Include(c => c.Gear)
             .Include(c => c.CraftingSkills)
+            .Include(c => c.Skills)
             .FirstOrDefaultAsync(c =>
                 c.Server == server &&
                 c.Name == name &&

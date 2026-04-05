@@ -6,11 +6,30 @@ import ItemPreviewBox from '../economy/ItemPreviewBox'
 import InventoryAnomalyBanner from './InventoryAnomalyBanner'
 
 const BAG_ORDER = [
-  'Inventory', 'Safe', 'Storage', 'Locker',
+  'Inventory', 'Safe', 'Safe2', 'Storage', 'Locker',
   'Satchel', 'Sack', 'Case',
   'Wardrobe', 'Wardrobe2', 'Wardrobe3', 'Wardrobe4',
   'Wardrobe5', 'Wardrobe6', 'Wardrobe7', 'Wardrobe8',
 ]
+
+const BAG_LABELS: Record<string, string> = {
+  Inventory: 'Inventory',
+  Safe: 'Mog Safe',
+  Safe2: 'Mog Safe 2',
+  Storage: 'Storage',
+  Locker: 'Mog Locker',
+  Satchel: 'Mog Satchel',
+  Sack: 'Mog Sack',
+  Case: 'Mog Case',
+  Wardrobe: 'Mog Wardrobe 1',
+  Wardrobe2: 'Mog Wardrobe 2',
+  Wardrobe3: 'Mog Wardrobe 3',
+  Wardrobe4: 'Mog Wardrobe 4',
+  Wardrobe5: 'Mog Wardrobe 5',
+  Wardrobe6: 'Mog Wardrobe 6',
+  Wardrobe7: 'Mog Wardrobe 7',
+  Wardrobe8: 'Mog Wardrobe 8',
+}
 
 type SortField = 'itemName' | 'category' | 'quantity'
 type SortDir = 'asc' | 'desc'
@@ -203,7 +222,7 @@ export default function InventoryTab({ characterId }: Props) {
         <span className="ml-2 text-gray-600 text-xs">#{item.itemId}</span>
       </td>
       <td className="px-4 py-1.5 text-gray-400">{item.category ?? '\u2014'}</td>
-      {showBag && <td className="px-4 py-1.5 text-gray-400">{item.bag}</td>}
+      {showBag && <td className="px-4 py-1.5 text-gray-400">{BAG_LABELS[item.bag!] ?? item.bag}</td>}
       <td className="px-4 py-1.5 text-right text-gray-300">
         {item.quantity}{item.stackSize > 1 ? `/${item.stackSize}` : ''}
       </td>
@@ -280,7 +299,7 @@ export default function InventoryTab({ characterId }: Props) {
                     : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
-                {bag}
+                {BAG_LABELS[bag] ?? bag}
                 <span className="ml-1.5 text-xs text-gray-500">
                   ({inventory[bag]?.length ?? 0})
                 </span>
