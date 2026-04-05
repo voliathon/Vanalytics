@@ -340,7 +340,7 @@ export default function InventoryTab({ characterId }: Props) {
             type="checkbox"
             checked={isSelected}
             onChange={() => toggleSelection(itemBag, item.slotIndex)}
-            className="accent-blue-500"
+            className="styled-checkbox"
           />
         </td>
         <td className="px-4 py-1.5">
@@ -403,7 +403,7 @@ export default function InventoryTab({ characterId }: Props) {
                         type="checkbox"
                         checked={searchResults.length > 0 && searchResults.every(i => selection.has(`${i.bag}:${i.slotIndex}`))}
                         onChange={() => toggleAllSearchVisible(searchResults)}
-                        className="accent-blue-500"
+                        className="styled-checkbox"
                       />
                     </th>
                     <th className="px-4 py-2 text-left w-12"></th>
@@ -504,7 +504,7 @@ export default function InventoryTab({ characterId }: Props) {
                           type="checkbox"
                           checked={activeItems.length > 0 && activeItems.every(i => selection.has(`${activeBag}:${i.slotIndex}`))}
                           onChange={() => toggleAllVisible(activeItems, activeBag)}
-                          className="accent-blue-500"
+                          className="styled-checkbox"
                         />
                       </th>
                       <th className="px-4 py-2 text-left w-12"></th>
