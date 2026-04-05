@@ -72,5 +72,6 @@ public class Character
     public List<CharacterJob> Jobs { get; set; } = [];
     public List<EquippedGear> Gear { get; set; } = [];
     public List<CraftingSkill> CraftingSkills { get; set; } = [];
+    public List<CharacterSkill> Skills { get; set; } = [];
     public List<MacroBook> MacroBooks { get; set; } = [];
 }

@@ -1,16 +1,36 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
-import type { InventoryByBag, InventoryItem, GameItemDetail } from '../../types/api'
+import type { InventoryByBag, InventoryItem, GameItemDetail, AnomalyResponse } from '../../types/api'
 import ItemPreviewBox from '../economy/ItemPreviewBox'
 import InventoryAnomalyBanner from './InventoryAnomalyBanner'
+import BulkMoveTray from './BulkMoveTray'
 
 const BAG_ORDER = [
-  'Inventory', 'Safe', 'Storage', 'Locker',
+  'Inventory', 'Safe', 'Safe2', 'Storage', 'Locker',
   'Satchel', 'Sack', 'Case',
   'Wardrobe', 'Wardrobe2', 'Wardrobe3', 'Wardrobe4',
   'Wardrobe5', 'Wardrobe6', 'Wardrobe7', 'Wardrobe8',
 ]
+
+const BAG_LABELS: Record<string, string> = {
+  Inventory: 'Inventory',
+  Safe: 'Mog Safe',
+  Safe2: 'Mog Safe 2',
+  Storage: 'Storage',
+  Locker: 'Mog Locker',
+  Satchel: 'Mog Satchel',
+  Sack: 'Mog Sack',
+  Case: 'Mog Case',
+  Wardrobe: 'Mog Wardrobe 1',
+  Wardrobe2: 'Mog Wardrobe 2',
+  Wardrobe3: 'Mog Wardrobe 3',
+  Wardrobe4: 'Mog Wardrobe 4',
+  Wardrobe5: 'Mog Wardrobe 5',
+  Wardrobe6: 'Mog Wardrobe 6',
+  Wardrobe7: 'Mog Wardrobe 7',
+  Wardrobe8: 'Mog Wardrobe 8',
+}
 
 type SortField = 'itemName' | 'category' | 'quantity'
 type SortDir = 'asc' | 'desc'
@@ -23,6 +43,8 @@ export default function InventoryTab({ characterId }: Props) {
   const [inventory, setInventory] = useState<InventoryByBag | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeBag, setActiveBag] = useState<string>('')
+  const [activeView, setActiveView] = useState<'anomalies' | 'bag'>('bag')
+  const [anomalyCount, setAnomalyCount] = useState(0)
   const [search, setSearch] = useState('')
   const [tableExpanded, setTableExpanded] = useState(false)
   const [sortField, setSortField] = useState<SortField>('itemName')
@@ -35,16 +57,122 @@ export default function InventoryTab({ characterId }: Props) {
   const [itemDetailCache, setItemDetailCache] = useState<Map<number, GameItemDetail>>(new Map())
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Bulk move selection state
+  const [selection, setSelection] = useState<Set<string>>(new Set())
+  const [submitting, setSubmitting] = useState(false)
+
+  const toggleSelection = useCallback((bag: string, slotIndex: number) => {
+    const key = `${bag}:${slotIndex}`
+    setSelection(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  const toggleAllVisible = useCallback((items: InventoryItem[], bag: string) => {
+    setSelection(prev => {
+      const next = new Set(prev)
+      const keys = items.map(i => `${bag}:${i.slotIndex}`)
+      const allSelected = keys.every(k => next.has(k))
+      if (allSelected) {
+        keys.forEach(k => next.delete(k))
+      } else {
+        keys.forEach(k => next.add(k))
+      }
+      return next
+    })
+  }, [])
+
+  const toggleAllSearchVisible = useCallback((items: (InventoryItem & { bag: string })[]) => {
+    setSelection(prev => {
+      const next = new Set(prev)
+      const keys = items.map(i => `${i.bag}:${i.slotIndex}`)
+      const allSelected = keys.every(k => next.has(k))
+      if (allSelected) {
+        keys.forEach(k => next.delete(k))
+      } else {
+        keys.forEach(k => next.add(k))
+      }
+      return next
+    })
+  }, [])
+
+  const removeSelection = useCallback((key: string) => {
+    setSelection(prev => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => setSelection(new Set()), [])
+
+  const fetchInventory = useCallback(() => {
+    api<InventoryByBag>(`/api/characters/${characterId}/inventory`)
+      .then(data => {
+        setInventory(data)
+      })
+      .catch(() => setInventory(null))
+      .finally(() => setLoading(false))
+  }, [characterId])
+
+  const handleBulkSubmit = useCallback(async (targetBag: string) => {
+    if (!inventory) return
+    const moves: { itemId: number; fromBag: string; fromSlot: number; toBag: string; quantity: number }[] = []
+    for (const key of selection) {
+      const [bag, slotStr] = key.split(':')
+      if (bag === targetBag) continue
+      const slotIndex = Number(slotStr)
+      const bagItems = inventory[bag]
+      if (!bagItems) continue
+      const item = bagItems.find(i => i.slotIndex === slotIndex)
+      if (!item) continue
+      moves.push({ itemId: item.itemId, fromBag: bag, fromSlot: slotIndex, toBag: targetBag, quantity: item.quantity })
+    }
+    if (moves.length === 0) return
+    setSubmitting(true)
+    try {
+      await api(`/api/characters/${characterId}/inventory/moves`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moves }),
+      })
+      clearSelection()
+      fetchInventory()
+    } catch {
+      // API errors handled by api() client
+    } finally {
+      setSubmitting(false)
+    }
+  }, [selection, inventory, characterId, clearSelection, fetchInventory])
+
+  // Set initial active bag on first load
   useEffect(() => {
     setLoading(true)
     api<InventoryByBag>(`/api/characters/${characterId}/inventory`)
       .then(data => {
         setInventory(data)
         const bags = BAG_ORDER.filter(b => data[b] && data[b].length > 0)
-        if (bags.length > 0 && !activeBag) setActiveBag(bags[0])
+        if (bags.length > 0) setActiveBag(bags[0])
       })
       .catch(() => setInventory(null))
       .finally(() => setLoading(false))
+  }, [characterId])
+
+  // Poll every 15 seconds to pick up inventory changes from the addon
+  useEffect(() => {
+    const id = setInterval(fetchInventory, 15000)
+    return () => clearInterval(id)
+  }, [fetchInventory])
+
+  // Anomaly count is updated via the onAnomalyCountChange callback from InventoryAnomalyBanner.
+  // We also need an initial count before the user clicks the Anomalies tab (banner hasn't mounted yet).
+  useEffect(() => {
+    api<AnomalyResponse>(`/api/characters/${characterId}/inventory/anomalies`)
+      .then(data => setAnomalyCount(data.anomalies.length))
+      .catch(() => {})
   }, [characterId])
 
   const availableBags = useMemo(() => {
@@ -62,6 +190,15 @@ export default function InventoryTab({ characterId }: Props) {
     }
     return Array.from(cats).sort()
   }, [inventory])
+
+  const selectionCountByBag = useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const key of selection) {
+      const bag = key.split(':')[0]
+      counts[bag] = (counts[bag] ?? 0) + 1
+    }
+    return counts
+  }, [selection])
 
   const isSearching = search.length > 0
 
@@ -112,12 +249,6 @@ export default function InventoryTab({ characterId }: Props) {
   const sortIndicator = (field: SortField) => {
     if (sortField !== field) return ''
     return sortDir === 'asc' ? ' \u25B2' : ' \u25BC'
-  }
-
-  const handleSearchResultClick = (bag: string) => {
-    setActiveBag(bag)
-    setTableExpanded(true)
-    setSearch('')
   }
 
   const handleBagClick = (bag: string) => {
@@ -184,35 +315,54 @@ export default function InventoryTab({ characterId }: Props) {
     )
   }
 
-  const renderRow = (item: InventoryItem & { bag?: string }, key: string, showBag?: boolean) => (
-    <tr
-      key={key}
-      className={`border-t border-gray-700/50 hover:bg-gray-800/50${showBag ? ' cursor-pointer' : ''}`}
-      onClick={showBag ? () => handleSearchResultClick(item.bag!) : undefined}
-      onMouseEnter={() => handleRowEnter(item.itemId)}
-      onMouseMove={handleMouseMove}
-      onMouseLeave={handleRowLeave}
-    >
-      <td className="px-4 py-1.5">
-        {item.iconPath && (
-          <img src={`/item-images/${item.iconPath}`} alt="" className="w-8 h-auto object-contain" loading="lazy" />
-        )}
-      </td>
-      <td className="px-4 py-1.5 text-gray-100">
-        {item.itemName}
-        <span className="ml-2 text-gray-600 text-xs">#{item.itemId}</span>
-      </td>
-      <td className="px-4 py-1.5 text-gray-400">{item.category ?? '\u2014'}</td>
-      {showBag && <td className="px-4 py-1.5 text-gray-400">{item.bag}</td>}
-      <td className="px-4 py-1.5 text-right text-gray-300">
-        {item.quantity}{item.stackSize > 1 ? `/${item.stackSize}` : ''}
-      </td>
-    </tr>
-  )
+  const renderRow = (item: InventoryItem & { bag?: string }, key: string, showBag?: boolean) => {
+    const itemBag = showBag ? item.bag! : activeBag
+    const selKey = `${itemBag}:${item.slotIndex}`
+    const isSelected = selection.has(selKey)
+
+    return (
+      <tr
+        key={key}
+        className={`border-t border-gray-700/50 cursor-pointer ${
+          isSelected
+            ? 'bg-blue-500/[0.08] border-l-3 border-l-blue-500'
+            : 'hover:bg-gray-800/50'
+        }`}
+        onClick={() => {
+          toggleSelection(itemBag, item.slotIndex)
+        }}
+        onMouseEnter={() => handleRowEnter(item.itemId)}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleRowLeave}
+      >
+        <td className="px-2 py-1.5 w-8 text-center" onClick={e => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => toggleSelection(itemBag, item.slotIndex)}
+            className="styled-checkbox"
+          />
+        </td>
+        <td className="px-4 py-1.5">
+          {item.iconPath && (
+            <img src={`/item-images/${item.iconPath}`} alt="" className="w-8 h-auto object-contain" loading="lazy" />
+          )}
+        </td>
+        <td className="px-4 py-1.5 text-gray-100">
+          {item.itemName}
+          <span className="ml-2 text-gray-600 text-xs">#{item.itemId}</span>
+        </td>
+        <td className="px-4 py-1.5 text-gray-400">{item.category ?? '\u2014'}</td>
+        {showBag && <td className="px-4 py-1.5 text-gray-400">{BAG_LABELS[item.bag!] ?? item.bag}</td>}
+        <td className="px-4 py-1.5 text-right text-gray-300">
+          {item.quantity}{item.stackSize > 1 ? `/${item.stackSize}` : ''}
+        </td>
+      </tr>
+    )
+  }
 
   return (
-    <div className="relative" ref={containerRef}>
-      <InventoryAnomalyBanner characterId={characterId} />
+    <div className={`relative ${selection.size > 0 ? 'pb-16' : ''}`} ref={containerRef}>
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-lg font-semibold">Inventory</h2>
         <div className="relative w-64">
@@ -248,6 +398,14 @@ export default function InventoryTab({ characterId }: Props) {
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-800 text-gray-400 text-xs uppercase">
+                    <th className="px-2 py-2 w-8 text-center">
+                      <input
+                        type="checkbox"
+                        checked={searchResults.length > 0 && searchResults.every(i => selection.has(`${i.bag}:${i.slotIndex}`))}
+                        onChange={() => toggleAllSearchVisible(searchResults)}
+                        className="styled-checkbox"
+                      />
+                    </th>
                     <th className="px-4 py-2 text-left w-12"></th>
                     <th className="px-4 py-2 text-left">Item</th>
                     <th className="px-4 py-2 text-left">Category</th>
@@ -270,23 +428,48 @@ export default function InventoryTab({ characterId }: Props) {
       {!isSearching && (
         <>
           <div className="flex flex-wrap items-center gap-1 border-b border-gray-700 mb-4">
+            {/* Anomalies tab — always first */}
+            <button
+              onClick={() => { setActiveView('anomalies'); setTableExpanded(false) }}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                activeView === 'anomalies'
+                  ? 'text-blue-400 border-b-2 border-blue-400 -mb-px'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Anomalies
+              {anomalyCount > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-amber-600 px-1.5 py-0.5 text-[10px] font-bold text-white leading-none">
+                  {anomalyCount}
+                </span>
+              )}
+            </button>
             {availableBags.map(bag => (
               <button
                 key={bag}
-                onClick={() => handleBagClick(bag)}
+                onClick={() => { setActiveView('bag'); handleBagClick(bag) }}
                 className={`px-3 py-2 text-sm font-medium transition-colors ${
-                  activeBag === bag && tableExpanded
+                  activeView === 'bag' && activeBag === bag && tableExpanded
                     ? 'text-blue-400 border-b-2 border-blue-400 -mb-px'
                     : 'text-gray-500 hover:text-gray-300'
                 }`}
               >
-                {bag}
-                <span className="ml-1.5 text-xs text-gray-500">
-                  ({inventory[bag]?.length ?? 0})
-                </span>
+                {BAG_LABELS[bag] ?? bag}
+                {(() => {
+                  const total = inventory[bag]?.length ?? 0
+                  const selected = selectionCountByBag[bag] ?? 0
+                  if (selected > 0) {
+                    return (
+                      <span className="ml-1.5 text-xs bg-blue-900/50 text-blue-400 rounded-full px-1.5">
+                        {selected} / {total}
+                      </span>
+                    )
+                  }
+                  return <span className="ml-1.5 text-xs text-gray-500">({total})</span>
+                })()}
               </button>
             ))}
-            {tableExpanded && (
+            {activeView === 'bag' && tableExpanded && (
               <select
                 value={categoryFilter}
                 onChange={e => setCategoryFilter(e.target.value)}
@@ -300,7 +483,13 @@ export default function InventoryTab({ characterId }: Props) {
             )}
           </div>
 
-          {tableExpanded && (
+          {/* Anomalies tab content */}
+          {activeView === 'anomalies' && (
+            <InventoryAnomalyBanner characterId={characterId} onAnomalyCountChange={setAnomalyCount} />
+          )}
+
+          {/* Bag tab content */}
+          {activeView === 'bag' && tableExpanded && (
             activeItems.length === 0 ? (
               <p className="text-gray-400 text-sm py-4">
                 {categoryFilter ? 'No items in this category.' : 'This bag is empty.'}
@@ -310,23 +499,22 @@ export default function InventoryTab({ characterId }: Props) {
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-gray-800 text-gray-400 text-xs uppercase">
+                      <th className="px-2 py-2 w-8 text-center">
+                        <input
+                          type="checkbox"
+                          checked={activeItems.length > 0 && activeItems.every(i => selection.has(`${activeBag}:${i.slotIndex}`))}
+                          onChange={() => toggleAllVisible(activeItems, activeBag)}
+                          className="styled-checkbox"
+                        />
+                      </th>
                       <th className="px-4 py-2 text-left w-12"></th>
-                      <th
-                        className="px-4 py-2 text-left cursor-pointer hover:text-gray-200 select-none"
-                        onClick={() => handleSort('itemName')}
-                      >
+                      <th className="px-4 py-2 text-left cursor-pointer hover:text-gray-200 select-none" onClick={() => handleSort('itemName')}>
                         Item{sortIndicator('itemName')}
                       </th>
-                      <th
-                        className="px-4 py-2 text-left cursor-pointer hover:text-gray-200 select-none"
-                        onClick={() => handleSort('category')}
-                      >
+                      <th className="px-4 py-2 text-left cursor-pointer hover:text-gray-200 select-none" onClick={() => handleSort('category')}>
                         Category{sortIndicator('category')}
                       </th>
-                      <th
-                        className="px-4 py-2 text-right cursor-pointer hover:text-gray-200 select-none w-20"
-                        onClick={() => handleSort('quantity')}
-                      >
+                      <th className="px-4 py-2 text-right cursor-pointer hover:text-gray-200 select-none w-20" onClick={() => handleSort('quantity')}>
                         Qty{sortIndicator('quantity')}
                       </th>
                     </tr>
@@ -341,6 +529,17 @@ export default function InventoryTab({ characterId }: Props) {
             )
           )}
         </>
+      )}
+
+      {inventory && (
+        <BulkMoveTray
+          selection={selection}
+          inventory={inventory}
+          onRemove={removeSelection}
+          onClear={clearSelection}
+          onSubmit={handleBulkSubmit}
+          submitting={submitting}
+        />
       )}
 
       {/* Item preview tooltip */}

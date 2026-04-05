@@ -91,6 +91,7 @@ export interface CharacterDetail {
   jobs: JobEntry[]
   gear: GearEntry[]
   craftingSkills: CraftingEntry[]
+  skills: SkillEntry[]
   favoriteAnimation?: { category: string; animationName: string; motionIndex: number }
 }
 
@@ -107,6 +108,12 @@ export interface GearEntry {
   slot: string
   itemId: number
   itemName: string
+}
+
+export interface SkillEntry {
+  skill: string
+  level: number
+  cap: number
 }
 
 export interface CraftingEntry {
@@ -711,12 +718,13 @@ export interface AnomalyDetails {
 }
 
 export interface Anomaly {
-  type: 'duplicate' | 'splitStack' | 'nearCapacity'
+  type: 'duplicate' | 'nearCapacity'
   severity: 'info' | 'warning'
   anomalyKey: string
   itemId: number | null
   itemName: string | null
   bags: string[]
+  isEquipment: boolean
   details: AnomalyDetails
   suggestedFix: SuggestedFix | null
 }
@@ -736,7 +744,7 @@ export interface MoveOrderResponse {
 export interface AnomalyResponse {
   anomalies: Anomaly[]
   dismissedCount: number
-  dismissedKeys: string[]
+  dismissedKeys: { key: string; label: string }[]
   pendingMoves: MoveOrderResponse[]
 }
 

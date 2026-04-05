@@ -139,6 +139,7 @@ public class SyncController : ControllerBase
         await _db.CharacterJobs.Where(j => j.CharacterId == character.Id).ExecuteDeleteAsync();
         await _db.EquippedGear.Where(g => g.CharacterId == character.Id).ExecuteDeleteAsync();
         await _db.CraftingSkills.Where(s => s.CharacterId == character.Id).ExecuteDeleteAsync();
+        await _db.CharacterSkills.Where(s => s.CharacterId == character.Id).ExecuteDeleteAsync();
 
         // Re-add jobs directly via the DbSet (avoids navigation-property tracking issues)
         var newJobs = new List<CharacterJob>();
@@ -193,6 +194,23 @@ public class SyncController : ControllerBase
             });
         }
         _db.CraftingSkills.AddRange(newCrafting);
+
+        // Re-add character skills (combat/magic/automaton)
+        var newSkills = new List<CharacterSkill>();
+        foreach (var skillEntry in request.Skills)
+        {
+            if (!Enum.TryParse<SkillType>(skillEntry.Skill.Replace(" ", "").Replace("-", ""), true, out var skillType)) continue;
+
+            newSkills.Add(new CharacterSkill
+            {
+                Id = Guid.NewGuid(),
+                CharacterId = character.Id,
+                Skill = skillType,
+                Level = skillEntry.Level,
+                Cap = skillEntry.Cap
+            });
+        }
+        _db.CharacterSkills.AddRange(newSkills);
 
         // Upsert item model mappings from addon's model table
         if (request.Models.Count > 0 && request.Gear.Count > 0)
@@ -390,6 +408,65 @@ public class SyncController : ControllerBase
         return NoContent();
     }
 
+    // === Inventory Moves ===
+
+    [HttpGet("inventory/moves/pending")]
+    public async Task<IActionResult> GetPendingMoves()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var character = await _db.Characters
+            .OrderByDescending(c => c.LastSyncAt)
+            .FirstOrDefaultAsync(c => c.UserId == userId);
+        if (character is null)
+            return Ok(new { moves = Array.Empty<object>() });
+
+        var moves = await _db.InventoryMoveOrders
+            .Where(m => m.CharacterId == character.Id && m.Status == MoveOrderStatus.Pending)
+            .Join(_db.GameItems, m => m.ItemId, g => g.ItemId, (m, g) => new
+            {
+                m.Id,
+                m.ItemId,
+                ItemName = g.Name ?? g.NameJa ?? "Unknown",
+                FromBag = m.FromBag.ToString(),
+                m.FromSlot,
+                ToBag = m.ToBag.ToString(),
+                m.Quantity,
+            })
+            .OrderBy(m => m.Id)
+            .ToListAsync();
+
+        return Ok(new { moves });
+    }
+
+    [HttpPost("inventory/moves/acknowledge")]
+    public async Task<IActionResult> AcknowledgeMoves([FromBody] AcknowledgeMovesRequest request)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var character = await _db.Characters
+            .OrderByDescending(c => c.LastSyncAt)
+            .FirstOrDefaultAsync(c => c.UserId == userId);
+        if (character is null)
+            return Ok(new { acknowledged = 0 });
+
+        var now = DateTimeOffset.UtcNow;
+        var moveIds = request.MoveIds ?? [];
+
+        var orders = await _db.InventoryMoveOrders
+            .Where(m => moveIds.Contains(m.Id) && m.CharacterId == character.Id && m.Status == MoveOrderStatus.Pending)
+            .ToListAsync();
+
+        foreach (var order in orders)
+        {
+            order.Status = MoveOrderStatus.Completed;
+            order.CompletedAt = now;
+        }
+
+        await _db.SaveChangesAsync();
+        return Ok(new { acknowledged = orders.Count });
+    }
+
     private static MacroBookDetail MapBookToDetail(MacroBook book) => new()
     {
         BookNumber = book.BookNumber,
@@ -414,4 +491,9 @@ public class SyncController : ControllerBase
             }).ToList()
         }).ToList()
     };
+}
+
+public class AcknowledgeMovesRequest
+{
+    public List<long> MoveIds { get; set; } = [];
 }

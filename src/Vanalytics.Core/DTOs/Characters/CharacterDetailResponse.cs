@@ -64,6 +64,7 @@ public class CharacterDetailResponse
     public List<JobEntry> Jobs { get; set; } = [];
     public List<GearEntry> Gear { get; set; } = [];
     public List<CraftingEntry> CraftingSkills { get; set; } = [];
+    public List<SkillEntry> Skills { get; set; } = [];
 }
 
 public class JobEntry
@@ -95,4 +96,11 @@ public class FavoriteAnimationDto
     public string Category { get; set; } = string.Empty;
     public string AnimationName { get; set; } = string.Empty;
     public int MotionIndex { get; set; }
+}
+
+public class SkillEntry
+{
+    public string Skill { get; set; } = string.Empty;
+    public int Level { get; set; }
+    public int Cap { get; set; }
 }

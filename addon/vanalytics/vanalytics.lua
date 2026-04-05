@@ -13,6 +13,7 @@ require('pack')
 local session = require('session')
 local inventory = require('inventory')
 local macro_lib = require('macros')
+local moves_lib = require('moves')
 
 -- Default settings (matches settings.xml)
 local defaults = {
@@ -116,6 +117,101 @@ local craft_skill_ids = {
     [55] = 'Alchemy',
     [56] = 'Cooking',
     [57] = 'Synergy',
+}
+
+-----------------------------------------------------------------------
+-- Combat, magic, and automaton skill maps
+-- Name-based keys match windower.ffxi.get_player().skills (lowercase).
+-- ID-based keys are fallback for alternative Windower versions.
+-----------------------------------------------------------------------
+local combat_skill_names = {
+    ['hand-to-hand']    = 'HandToHand',
+    ['dagger']          = 'Dagger',
+    ['sword']           = 'Sword',
+    ['great sword']     = 'GreatSword',
+    ['axe']             = 'Axe',
+    ['great axe']       = 'GreatAxe',
+    ['scythe']          = 'Scythe',
+    ['polearm']         = 'Polearm',
+    ['katana']          = 'Katana',
+    ['great katana']    = 'GreatKatana',
+    ['club']            = 'Club',
+    ['staff']           = 'Staff',
+    ['archery']         = 'Archery',
+    ['marksmanship']    = 'Marksmanship',
+    ['throwing']        = 'Throwing',
+    ['guard']           = 'Guard',
+    ['evasion']         = 'Evasion',
+    ['shield']          = 'Shield',
+    ['parrying']        = 'Parrying',
+}
+
+local magic_skill_names = {
+    ['divine magic']        = 'DivineMagic',
+    ['healing magic']       = 'HealingMagic',
+    ['enhancing magic']     = 'EnhancingMagic',
+    ['enfeebling magic']    = 'EnfeeblingMagic',
+    ['elemental magic']     = 'ElementalMagic',
+    ['dark magic']          = 'DarkMagic',
+    ['summoning magic']     = 'SummoningMagic',
+    ['ninjutsu']            = 'Ninjutsu',
+    ['singing']             = 'Singing',
+    ['stringed instrument'] = 'StringedInstrument',
+    ['wind instrument']     = 'WindInstrument',
+    ['blue magic']          = 'BlueMagic',
+    ['geomancy']            = 'Geomancy',
+    ['handbell']            = 'Handbell',
+}
+
+local automaton_skill_names = {
+    ['automaton melee']   = 'AutomatonMelee',
+    ['automaton archery'] = 'AutomatonArchery',
+    ['automaton magic']   = 'AutomatonMagic',
+}
+
+local combat_skill_ids = {
+    [1]  = 'HandToHand',
+    [2]  = 'Dagger',
+    [3]  = 'Sword',
+    [4]  = 'GreatSword',
+    [5]  = 'Axe',
+    [6]  = 'GreatAxe',
+    [7]  = 'Scythe',
+    [8]  = 'Polearm',
+    [9]  = 'Katana',
+    [10] = 'GreatKatana',
+    [11] = 'Club',
+    [12] = 'Staff',
+    [25] = 'Archery',
+    [26] = 'Marksmanship',
+    [27] = 'Throwing',
+    [28] = 'Guard',
+    [29] = 'Evasion',
+    [30] = 'Shield',
+    [31] = 'Parrying',
+}
+
+local magic_skill_ids = {
+    [32] = 'DivineMagic',
+    [33] = 'HealingMagic',
+    [34] = 'EnhancingMagic',
+    [35] = 'EnfeeblingMagic',
+    [36] = 'ElementalMagic',
+    [37] = 'DarkMagic',
+    [38] = 'SummoningMagic',
+    [39] = 'Ninjutsu',
+    [40] = 'Singing',
+    [41] = 'StringedInstrument',
+    [42] = 'WindInstrument',
+    [43] = 'BlueMagic',
+    [44] = 'Geomancy',
+    [45] = 'Handbell',
+}
+
+local automaton_skill_ids = {
+    [22] = 'AutomatonMelee',
+    [23] = 'AutomatonArchery',
+    [24] = 'AutomatonMagic',
 }
 
 local function get_craft_rank(level)
@@ -702,6 +798,66 @@ local function read_character_state()
         end
     end
 
+    -- Collect combat, magic, and automaton skills
+    -- Try name-based keys first (lowercase strings), fall back to numeric IDs
+    local skills = {}
+    if player.skills then
+        local all_skill_names = {}
+        for k, v in pairs(combat_skill_names) do all_skill_names[k] = v end
+        for k, v in pairs(magic_skill_names) do all_skill_names[k] = v end
+        for k, v in pairs(automaton_skill_names) do all_skill_names[k] = v end
+
+        for skill_key, skill_name in pairs(all_skill_names) do
+            local skill = player.skills[skill_key]
+            if skill then
+                local level = 0
+                local cap = 0
+                if type(skill) == 'table' then
+                    level = skill.level or 0
+                    cap = skill.cap or 0
+                else
+                    level = tonumber(skill) or 0
+                end
+                if level > 0 then
+                    table.insert(skills, {
+                        skill = skill_name,
+                        level = level,
+                        cap = cap,
+                    })
+                end
+            end
+        end
+
+        -- Fall back to ID-based keys if name-based yielded nothing
+        if #skills == 0 then
+            local all_skill_ids = {}
+            for id, name in pairs(combat_skill_ids) do all_skill_ids[id] = name end
+            for id, name in pairs(magic_skill_ids) do all_skill_ids[id] = name end
+            for id, name in pairs(automaton_skill_ids) do all_skill_ids[id] = name end
+
+            for skill_id, skill_name in pairs(all_skill_ids) do
+                local skill = player.skills[skill_id]
+                if skill then
+                    local level = 0
+                    local cap = 0
+                    if type(skill) == 'table' then
+                        level = skill.level or 0
+                        cap = skill.cap or 0
+                    else
+                        level = tonumber(skill) or 0
+                    end
+                    if level > 0 then
+                        table.insert(skills, {
+                            skill = skill_name,
+                            level = level,
+                            cap = cap,
+                        })
+                    end
+                end
+            end
+        end
+    end
+
     -- Collect merit points (only non-zero values to keep payload small)
     local merits = nil
     if player.merits then
@@ -738,6 +894,7 @@ local function read_character_state()
         jobs = jobs,
         gear = gear,
         crafting = crafting,
+        skills = skills,
     }
 
     -- Read mob entity for race and model data
@@ -938,6 +1095,25 @@ end
 -----------------------------------------------------------------------
 local work_queue = {}
 
+moves_lib.init({
+    settings = settings,
+    http_request = http_request,
+    json_encode = json_encode,
+    json_decode = json_decode,
+    log = log,
+    log_error = log_error,
+    log_success = log_success,
+    enqueue = function(fn) table.insert(work_queue, fn) end,
+    inventory_sync = function()
+        local player = windower.ffxi.get_player()
+        local info = windower.ffxi.get_info()
+        if player and info then
+            local server_name = res.servers[info.server] and res.servers[info.server].en or 'Unknown'
+            inventory.sync(player.name, server_name)
+        end
+    end,
+})
+
 local function enqueue_sync_work()
     -- Queue each sync task as a separate frame's work
     -- Macros are intentionally excluded — use //va macros push to sync manually.
@@ -945,6 +1121,7 @@ local function enqueue_sync_work()
     -- when logging in from a fresh FFXI installation.
     table.insert(work_queue, function() do_sync() end)
     table.insert(work_queue, function() scan_bazaars() end)
+    table.insert(work_queue, function() moves_lib.check_pending() end)
 end
 
 -- Single prerender handler registered once at load time
@@ -1051,6 +1228,7 @@ windower.register_event('addon command', function(command, ...)
     if command == 'sync' then
         log('Syncing...')
         do_sync()
+        moves_lib.check_pending()
 
     elseif command == 'status' then
         local interval = get_effective_interval()
@@ -1239,6 +1417,16 @@ windower.register_event('addon command', function(command, ...)
             log('Macro commands: push | pull | status | dump')
         end
 
+    elseif command == 'moves' then
+        local subcommand = args[1] and args[1]:lower() or 'help'
+        if subcommand == 'execute' then
+            moves_lib.execute()
+        elseif subcommand == 'status' then
+            moves_lib.status()
+        else
+            log('Move commands: execute | status')
+        end
+
     elseif command == 'help' then
         log('--- Vanalytics Commands ---')
         log('//va apikey <key> - Set your API key')
@@ -1256,6 +1444,8 @@ windower.register_event('addon command', function(command, ...)
         log('//va macros push     - Force upload all macro books')
         log('//va macros pull     - Check for pending macro updates')
         log('//va macros status   - Show tracked macro book count')
+        log('//va moves execute   - Execute pending inventory move orders')
+        log('//va moves status    - Show pending move order details')
         log('//va help         - Show this help')
 
     else

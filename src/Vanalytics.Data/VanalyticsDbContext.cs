@@ -12,6 +12,7 @@ public class VanalyticsDbContext(DbContextOptions<VanalyticsDbContext> options)
     public DbSet<CharacterJob> CharacterJobs => Set<CharacterJob>();
     public DbSet<EquippedGear> EquippedGear => Set<EquippedGear>();
     public DbSet<CraftingSkill> CraftingSkills => Set<CraftingSkill>();
+    public DbSet<CharacterSkill> CharacterSkills => Set<CharacterSkill>();
     public DbSet<GameServer> GameServers => Set<GameServer>();
     public DbSet<GameItem> GameItems => Set<GameItem>();
     public DbSet<ServerStatusChange> ServerStatusChanges => Set<ServerStatusChange>();

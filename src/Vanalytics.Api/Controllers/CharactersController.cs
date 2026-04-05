@@ -48,6 +48,7 @@ public class CharactersController : ControllerBase
             .Include(c => c.Jobs)
             .Include(c => c.Gear)
             .Include(c => c.CraftingSkills)
+            .Include(c => c.Skills)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (character is null) return NotFound();
@@ -306,6 +307,12 @@ public class CharactersController : ControllerBase
             Craft = s.Craft.ToString(),
             Level = s.Level,
             Rank = s.Rank
+        }).ToList(),
+        Skills = c.Skills.Select(s => new SkillEntry
+        {
+            Skill = s.Skill.ToString(),
+            Level = s.Level,
+            Cap = s.Cap
         }).ToList()
     };
 }

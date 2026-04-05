@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import type { CharacterDetail, GearEntry, GameItemDetail } from '../../types/api'
+import type { CharacterDetail, GearEntry, GameItemDetail, SkillEntry } from '../../types/api'
 import { calculateBaseStats, STAT_KEYS, getBaseStatBreakdown, getJPGiftBonuses } from '../../lib/ffxi-stats'
 import type { BaseStats } from '../../lib/ffxi-stats'
 
@@ -228,7 +228,7 @@ export default function StatusPanel({ character, gear, itemCache }: StatusPanelP
           activeJob={activeJob}
         />
       )}
-      {activeTab === 'Skills' && <SkillsTab />}
+      {activeTab === 'Skills' && <SkillsTab skills={character.skills ?? []} />}
       </div>
     </div>
   )
@@ -529,10 +529,121 @@ function CombatTab({
   )
 }
 
-function SkillsTab() {
+/** Category groupings for skill names */
+const SKILL_CATEGORIES = {
+  Combat: [
+    'HandToHand', 'Dagger', 'Sword', 'GreatSword', 'Axe', 'GreatAxe',
+    'Scythe', 'Polearm', 'Katana', 'GreatKatana', 'Club', 'Staff',
+    'Archery', 'Marksmanship', 'Throwing',
+    'Guard', 'Evasion', 'Shield', 'Parrying',
+  ],
+  Magic: [
+    'DivineMagic', 'HealingMagic', 'EnhancingMagic', 'EnfeeblingMagic',
+    'ElementalMagic', 'DarkMagic', 'SummoningMagic', 'Ninjutsu',
+    'Singing', 'StringedInstrument', 'WindInstrument',
+    'BlueMagic', 'Geomancy', 'Handbell',
+  ],
+  Automaton: [
+    'AutomatonMelee', 'AutomatonArchery', 'AutomatonMagic',
+  ],
+} as const
+
+type SkillCategory = keyof typeof SKILL_CATEGORIES
+
+const SKILL_CATEGORY_TABS: SkillCategory[] = ['Combat', 'Magic', 'Automaton']
+
+/** Convert enum name to display label: "GreatSword" → "Great Sword" */
+function formatSkillName(enumName: string): string {
+  return enumName.replace(/([a-z])([A-Z])/g, '$1 $2')
+}
+
+function SkillsTab({ skills }: { skills: SkillEntry[] }) {
+  const [activeCategory, setActiveCategory] = useState<SkillCategory>('Combat')
+
+  const skillMap = useMemo(() => {
+    const map = new Map<string, SkillEntry>()
+    for (const s of skills) map.set(s.skill, s)
+    return map
+  }, [skills])
+
+  const categorySkills = useMemo(() => {
+    const names = SKILL_CATEGORIES[activeCategory]
+    return names.map(name => ({
+      name,
+      label: formatSkillName(name),
+      entry: skillMap.get(name),
+    }))
+  }, [activeCategory, skillMap])
+
+  // Sort: non-zero skills first (by level desc), then zero skills in static order
+  const sorted = useMemo(() => {
+    const withLevel = categorySkills.filter(s => s.entry && s.entry.level > 0)
+    const withoutLevel = categorySkills.filter(s => !s.entry || s.entry.level === 0)
+    withLevel.sort((a, b) => (b.entry?.level ?? 0) - (a.entry?.level ?? 0))
+    return [...withLevel, ...withoutLevel]
+  }, [categorySkills])
+
+  if (skills.length === 0) {
+    return (
+      <p className="text-gray-500 text-sm italic">
+        No skill data synced yet — update your addon and sync in-game.
+      </p>
+    )
+  }
+
   return (
-    <p className="text-gray-500 text-sm italic">
-      Coming soon — requires addon update
-    </p>
+    <div>
+      {/* Sub-tab pills */}
+      <div className="flex gap-1 mb-3">
+        {SKILL_CATEGORY_TABS.map(cat => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`px-3 py-1 text-xs font-medium rounded-full transition-colors ${
+              activeCategory === cat
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-800 text-gray-400 hover:text-gray-200'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {/* Skills table */}
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-gray-400 border-b border-gray-700">
+            <th className="text-left py-1 font-medium">Skill</th>
+            <th className="text-right py-1 font-medium">Level</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(({ name, label, entry }) => {
+            const level = entry?.level ?? 0
+            const cap = entry?.cap ?? 0
+            const hasBonus = cap > 0 && cap !== level
+            return (
+              <tr key={name} className="border-b border-gray-800">
+                <td className={`py-1 ${level > 0 ? 'text-gray-300' : 'text-gray-600'}`}>
+                  {label}
+                </td>
+                <td className={`py-1 text-right font-medium ${level > 0 ? 'text-gray-200' : 'text-gray-600'}`}>
+                  {hasBonus ? (
+                    <>
+                      <span className="text-gray-400">{cap}</span>
+                      <span className="text-gray-600 mx-1">/</span>
+                      <span>{level}</span>
+                    </>
+                  ) : (
+                    level
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }

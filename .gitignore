@@ -66,5 +66,6 @@ node_modules/
 !.claude/commands/
 !.claude/commands/**
 .superpowers/*
+**/.superpowers/*
 docs/specs/*
 docs/superpowers/*
