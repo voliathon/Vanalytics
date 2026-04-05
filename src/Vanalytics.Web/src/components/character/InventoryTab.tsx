@@ -60,16 +60,22 @@ export default function InventoryTab({ characterId }: Props) {
     api<InventoryByBag>(`/api/characters/${characterId}/inventory`)
       .then(data => {
         setInventory(data)
-        const bags = BAG_ORDER.filter(b => data[b] && data[b].length > 0)
-        if (bags.length > 0 && !activeBag) setActiveBag(bags[0])
       })
       .catch(() => setInventory(null))
       .finally(() => setLoading(false))
   }, [characterId])
 
+  // Set initial active bag on first load
   useEffect(() => {
     setLoading(true)
-    fetchInventory()
+    api<InventoryByBag>(`/api/characters/${characterId}/inventory`)
+      .then(data => {
+        setInventory(data)
+        const bags = BAG_ORDER.filter(b => data[b] && data[b].length > 0)
+        if (bags.length > 0) setActiveBag(bags[0])
+      })
+      .catch(() => setInventory(null))
+      .finally(() => setLoading(false))
   }, [characterId])
 
   // Poll every 15 seconds to pick up inventory changes from the addon
