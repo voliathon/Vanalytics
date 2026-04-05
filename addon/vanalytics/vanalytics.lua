@@ -13,6 +13,7 @@ require('pack')
 local session = require('session')
 local inventory = require('inventory')
 local macro_lib = require('macros')
+local moves_lib = require('moves')
 
 -- Default settings (matches settings.xml)
 local defaults = {
@@ -1017,6 +1018,17 @@ end
 -----------------------------------------------------------------------
 local work_queue = {}
 
+moves_lib.init({
+    settings = settings,
+    http_request = http_request,
+    json_encode = json_encode,
+    json_decode = json_decode,
+    log = log,
+    log_error = log_error,
+    log_success = log_success,
+    enqueue = function(fn) table.insert(work_queue, fn) end,
+})
+
 local function enqueue_sync_work()
     -- Queue each sync task as a separate frame's work
     -- Macros are intentionally excluded — use //va macros push to sync manually.
@@ -1024,6 +1036,7 @@ local function enqueue_sync_work()
     -- when logging in from a fresh FFXI installation.
     table.insert(work_queue, function() do_sync() end)
     table.insert(work_queue, function() scan_bazaars() end)
+    table.insert(work_queue, function() moves_lib.check_pending() end)
 end
 
 -- Single prerender handler registered once at load time
@@ -1318,6 +1331,16 @@ windower.register_event('addon command', function(command, ...)
             log('Macro commands: push | pull | status | dump')
         end
 
+    elseif command == 'moves' then
+        local subcommand = args[1] and args[1]:lower() or 'help'
+        if subcommand == 'execute' then
+            moves_lib.execute()
+        elseif subcommand == 'status' then
+            moves_lib.status()
+        else
+            log('Move commands: execute | status')
+        end
+
     elseif command == 'help' then
         log('--- Vanalytics Commands ---')
         log('//va apikey <key> - Set your API key')
@@ -1335,6 +1358,8 @@ windower.register_event('addon command', function(command, ...)
         log('//va macros push     - Force upload all macro books')
         log('//va macros pull     - Check for pending macro updates')
         log('//va macros status   - Show tracked macro book count')
+        log('//va moves execute   - Execute pending inventory move orders')
+        log('//va moves status    - Show pending move order details')
         log('//va help         - Show this help')
 
     else
