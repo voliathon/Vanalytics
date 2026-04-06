@@ -5,6 +5,7 @@ import type { AnomalyResponse, Anomaly } from '../../types/api'
 interface InventoryAnomalyBannerProps {
   characterId: string
   onAnomalyCountChange?: (count: number) => void
+  onDismissedKeysChange?: (keys: Set<string>) => void
 }
 
 const BAG_OPTIONS = [
@@ -35,7 +36,7 @@ const BAG_LABELS: Record<string, string> = {
 
 const bagLabel = (key: string) => BAG_LABELS[key] ?? key
 
-export default function InventoryAnomalyBanner({ characterId, onAnomalyCountChange }: InventoryAnomalyBannerProps) {
+export default function InventoryAnomalyBanner({ characterId, onAnomalyCountChange, onDismissedKeysChange }: InventoryAnomalyBannerProps) {
   const [data, setData] = useState<AnomalyResponse | null>(null)
   const [showDismissed, setShowDismissed] = useState(false)
   const [overrideBags, setOverrideBags] = useState<Record<string, string>>({})
@@ -48,6 +49,7 @@ export default function InventoryAnomalyBanner({ characterId, onAnomalyCountChan
       .then(data => {
         setData(data)
         onAnomalyCountChange?.(data.anomalies.length)
+        onDismissedKeysChange?.(new Set(data.dismissedKeys.map(d => d.key)))
       })
       .catch(() => setData(null))
       .finally(() => { setLoading(false); initialLoadRef.current = false })

@@ -692,6 +692,8 @@ export interface InventoryItem {
   category: string | null
   stackSize: number
   baseSell: number | null
+  isRare: boolean
+  isExclusive: boolean
 }
 
 export type InventoryByBag = Record<string, InventoryItem[]>
@@ -814,4 +816,79 @@ export interface PlayerListItem {
   race: string | null
   linkshell: string | null
   lastSyncedAt: string | null
+}
+
+// Crafting Recipes
+export interface RecipeSummary {
+  id: number
+  resultItemId: number
+  resultItemName: string
+  resultItemIcon: string | null
+  resultQty: number
+  primaryCraft: string
+  primaryCraftLevel: number
+  subCrafts: { craft: string; level: number }[]
+  crystalItemId: number
+  crystalName: string
+  crystalIcon: string | null
+  ingredientCount: number
+  isDesynth: boolean
+  ingredients?: { itemId: number; name: string; quantity: number; baseSell: number | null }[]
+}
+
+export interface RecipeSearchResult {
+  totalCount: number
+  page: number
+  pageSize: number
+  recipes: RecipeSummary[]
+}
+
+export interface RecipeIngredientDetail {
+  itemId: number
+  name: string
+  iconPath: string | null
+  quantity: number
+  stackSize: number
+}
+
+export interface RecipeItemRef {
+  itemId: number
+  name: string
+  iconPath: string | null
+  quantity: number
+}
+
+export interface RecipeDetail {
+  id: number
+  primaryCraft: string
+  primaryCraftLevel: number
+  subCrafts: { craft: string; level: number }[]
+  crystal: RecipeItemRef
+  hqCrystal: RecipeItemRef | null
+  ingredients: RecipeIngredientDetail[]
+  result: RecipeItemRef
+  resultHq1: RecipeItemRef | null
+  resultHq2: RecipeItemRef | null
+  resultHq3: RecipeItemRef | null
+  isDesynth: boolean
+  contentTag: string | null
+  skillRequirements: Record<string, number>
+}
+
+export interface ItemRecipeInfo {
+  craftedFrom: {
+    id: number
+    resultItemName: string
+    primaryCraft: string
+    primaryCraftLevel: number
+    resultQty: number
+    isHqResult: boolean
+  }[]
+  usedIn: {
+    id: number
+    resultItemName: string
+    primaryCraft: string
+    primaryCraftLevel: number
+    quantity: number
+  }[]
 }

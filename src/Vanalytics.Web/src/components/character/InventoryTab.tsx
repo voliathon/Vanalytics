@@ -1,10 +1,12 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
-import type { InventoryByBag, InventoryItem, GameItemDetail, AnomalyResponse } from '../../types/api'
+import type { InventoryByBag, InventoryItem, GameItemDetail, AnomalyResponse, CraftingEntry } from '../../types/api'
 import ItemPreviewBox from '../economy/ItemPreviewBox'
 import InventoryAnomalyBanner from './InventoryAnomalyBanner'
 import BulkMoveTray from './BulkMoveTray'
+import InventoryTotals from './InventoryTotals'
+import InventoryCrafting from './InventoryCrafting'
 
 const BAG_ORDER = [
   'Inventory', 'Safe', 'Safe2', 'Storage', 'Locker',
@@ -39,14 +41,16 @@ const formatGil = (amount: number) => amount.toLocaleString()
 
 interface Props {
   characterId: string
+  craftingSkills?: CraftingEntry[]
 }
 
-export default function InventoryTab({ characterId }: Props) {
+export default function InventoryTab({ characterId, craftingSkills = [] }: Props) {
   const [inventory, setInventory] = useState<InventoryByBag | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeBag, setActiveBag] = useState<string>('')
-  const [activeView, setActiveView] = useState<'anomalies' | 'bag' | 'sellAdvisor'>('bag')
+  const [activeView, setActiveView] = useState<'anomalies' | 'bag' | 'sellAdvisor' | 'totals' | 'crafting'>('bag')
   const [anomalyCount, setAnomalyCount] = useState(0)
+  const [dismissedAnomalyKeys, setDismissedAnomalyKeys] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [tableExpanded, setTableExpanded] = useState(false)
   const [sortField, setSortField] = useState<SortField>('itemName')
@@ -173,7 +177,10 @@ export default function InventoryTab({ characterId }: Props) {
   // We also need an initial count before the user clicks the Anomalies tab (banner hasn't mounted yet).
   useEffect(() => {
     api<AnomalyResponse>(`/api/characters/${characterId}/inventory/anomalies`)
-      .then(data => setAnomalyCount(data.anomalies.length))
+      .then(data => {
+        setAnomalyCount(data.anomalies.length)
+        setDismissedAnomalyKeys(new Set(data.dismissedKeys.map(d => d.key)))
+      })
       .catch(() => {})
   }, [characterId])
 
@@ -484,6 +491,26 @@ export default function InventoryTab({ characterId }: Props) {
             >
               Sell Advisor
             </button>
+            <button
+              onClick={() => { setActiveView('totals'); setTableExpanded(false) }}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                activeView === 'totals'
+                  ? 'text-blue-400 border-b-2 border-blue-400 -mb-px'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Totals
+            </button>
+            <button
+              onClick={() => { setActiveView('crafting'); setTableExpanded(false) }}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                activeView === 'crafting'
+                  ? 'text-blue-400 border-b-2 border-blue-400 -mb-px'
+                  : 'text-gray-500 hover:text-gray-300'
+              }`}
+            >
+              Crafting
+            </button>
             {availableBags.map(bag => (
               <button
                 key={bag}
@@ -525,7 +552,7 @@ export default function InventoryTab({ characterId }: Props) {
 
           {/* Anomalies tab content */}
           {activeView === 'anomalies' && (
-            <InventoryAnomalyBanner characterId={characterId} onAnomalyCountChange={setAnomalyCount} />
+            <InventoryAnomalyBanner characterId={characterId} onAnomalyCountChange={setAnomalyCount} onDismissedKeysChange={setDismissedAnomalyKeys} />
           )}
 
           {/* Sell Advisor tab content */}
@@ -577,6 +604,22 @@ export default function InventoryTab({ characterId }: Props) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Totals tab content */}
+          {activeView === 'totals' && inventory && (
+            <InventoryTotals inventory={inventory} dismissedAnomalyKeys={dismissedAnomalyKeys} />
+          )}
+
+          {/* Crafting tab content */}
+          {activeView === 'crafting' && inventory && (
+            <InventoryCrafting
+              inventory={inventory}
+              craftingSkills={craftingSkills}
+              onRowEnter={handleRowEnter}
+              onRowMove={handleMouseMove}
+              onRowLeave={handleRowLeave}
+            />
           )}
 
           {/* Bag tab content */}

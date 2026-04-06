@@ -30,6 +30,8 @@ import ForumNewThreadPage from './pages/ForumNewThreadPage'
 import ForumSearchPage from './pages/ForumSearchPage'
 import UserProfilePage from './pages/UserProfilePage'
 import PlayerDirectoryPage from './pages/PlayerDirectoryPage'
+import RecipeBrowserPage from './pages/RecipeBrowserPage'
+import RecipeDetailPage from './pages/RecipeDetailPage'
 
 
 function SamlCodeHandler() {
@@ -124,6 +126,8 @@ export default function App() {
             <Route path="/admin/saml" element={<ProtectedRoute requiredRole="Admin"><AdminSamlPage /></ProtectedRoute>} />
             <Route path="/npcs" element={<NpcBrowserPage />} />
             <Route path="/zones" element={<ZoneBrowserPage />} />
+            <Route path="/recipes" element={<RecipeBrowserPage />} />
+            <Route path="/recipes/:id" element={<RecipeDetailPage />} />
             <Route path="/sessions/:id" element={<ProtectedRoute><SessionReportPage /></ProtectedRoute>} />
             <Route path="/debug/models" element={<ProtectedRoute><ModelDebugPage /></ProtectedRoute>} />
 

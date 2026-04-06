@@ -108,7 +108,9 @@ public class CharactersController : ControllerBase
                     gi.IconPath,
                     gi.Category,
                     gi.StackSize,
-                    gi.BaseSell
+                    gi.BaseSell,
+                    IsRare = (gi.Flags & 0x8000) != 0,
+                    IsExclusive = (gi.Flags & 0x4000) != 0
                 })
             .OrderBy(i => i.Bag)
             .ThenBy(i => i.ItemName)
