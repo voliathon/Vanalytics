@@ -692,6 +692,8 @@ export interface InventoryItem {
   category: string | null
   stackSize: number
   baseSell: number | null
+  isRare: boolean
+  isExclusive: boolean
 }
 
 export type InventoryByBag = Record<string, InventoryItem[]>

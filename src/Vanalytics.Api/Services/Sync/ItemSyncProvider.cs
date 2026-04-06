@@ -579,10 +579,11 @@ public class ItemSyncProvider : ISyncProvider
         }
 
         // Parse INSERT statements:
-        // (itemId,subid,'name','sortname',stackSize,flags,aH,noSale,BaseSell,...)
+        // (itemId,subid,'name','sortname',type,stackSize,flags,aH,BaseSell,...)
+        // Note: 'type' column can be @VARIABLE (e.g., @FURNISHING_TYPE) or numeric
         var parsed = new Dictionary<int, int>();
         var regex = new System.Text.RegularExpressions.Regex(
-            @"\((\d+),\d+,'[^']*','[^']*',\d+,\d+,\d+,\d+,(\d+)");
+            @"\((\d+),\d+,'[^']*','[^']*',(?:@\w+|\d+),\d+,\d+,(?:@\w+|\d+),(\d+)");
 
         foreach (System.Text.RegularExpressions.Match match in regex.Matches(sql))
         {
