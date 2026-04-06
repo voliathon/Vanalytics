@@ -102,7 +102,7 @@ public class ForumController : ControllerBase
 
         return Ok(new EnrichedThreadDetailResponse(
             thread.Id, thread.Title, thread.Slug, thread.CategoryId, thread.CategoryName, thread.CategorySlug,
-            thread.IsPinned, thread.IsLocked, thread.IsDeleted, thread.AuthorId,
+            thread.IsPinned, thread.IsLocked, thread.IsDeleted, thread.CategoryIsSystem, thread.AuthorId,
             thread.CreatedAt, thread.LastPostAt,
             author?.Username ?? "[deleted]",
             author?.DisplayName,
@@ -221,6 +221,16 @@ public class ForumController : ControllerBase
     [HttpPost("threads/{threadId}/posts")]
     public async Task<IActionResult> CreatePost(int threadId, [FromBody] CreatePostRequest request)
     {
+        // System categories (e.g. News) are admin-only for posting
+        var db = HttpContext.RequestServices.GetRequiredService<VanalyticsDbContext>();
+        var threadCategory = await db.Set<ForumThread>()
+            .Where(t => t.Id == threadId)
+            .Select(t => new { t.Category.IsSystem })
+            .FirstOrDefaultAsync();
+        if (threadCategory == null) return NotFound();
+        if (threadCategory.IsSystem && !User.IsInRole("Admin"))
+            return Forbid();
+
         if (string.IsNullOrWhiteSpace(request.Body))
             return BadRequest(new { error = "Body is required." });
 
@@ -230,7 +240,6 @@ public class ForumController : ControllerBase
         // Validate replyToPostId if provided (must exist and belong to same thread)
         if (request.ReplyToPostId.HasValue)
         {
-            var db = HttpContext.RequestServices.GetRequiredService<VanalyticsDbContext>();
             var replyTargetExists = await db.Set<Soverance.Forum.Models.ForumPost>()
                 .AnyAsync(p => p.Id == request.ReplyToPostId.Value && p.ThreadId == threadId);
             if (!replyTargetExists)
@@ -245,7 +254,6 @@ public class ForumController : ControllerBase
 
         if (post != null)
         {
-            var db = HttpContext.RequestServices.GetRequiredService<VanalyticsDbContext>();
             await LinkAttachmentsToPost(db, sanitizedBody, post.Id);
         }
 

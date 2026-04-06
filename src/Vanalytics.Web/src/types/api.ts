@@ -240,6 +240,7 @@ export interface ThreadDetailResponse {
   isPinned: boolean
   isLocked: boolean
   isDeleted: boolean
+  categoryIsSystem: boolean
   authorId: string
   createdAt: string
   lastPostAt: string
