@@ -17,6 +17,7 @@ public class ItemSyncProvider : ISyncProvider
     private const string ModelMappingsUrl = "https://raw.githubusercontent.com/LandSandBoat/server/base/sql/item_equipment.sql";
     private const string MobPoolsUrl = "https://raw.githubusercontent.com/LandSandBoat/server/base/sql/mob_pools.sql";
     private const string ItemBasicUrl = "https://raw.githubusercontent.com/LandSandBoat/server/base/sql/item_basic.sql";
+    private const string SynthRecipesUrl = "https://raw.githubusercontent.com/LandSandBoat/server/base/sql/synth_recipes.sql";
     private const int BatchSize = 1000;
 
     public string ProviderId => "items";
@@ -38,7 +39,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Started,
-            Message = "[Phase 1/4 — Items] Downloading item data from Windower Resources..."
+            Message = "[Phase 1/5 — Items] Downloading item data from Windower Resources..."
         });
 
         var client = _httpClientFactory.CreateClient();
@@ -51,7 +52,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = "[Phase 1/4 — Items] Parsing item data..."
+            Message = "[Phase 1/5 — Items] Parsing item data..."
         });
 
         var items = Services.LuaResourceParser.ParseItems(itemsLua);
@@ -112,7 +113,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = $"[Phase 1/4 — Items] Found {newItems.Count} new, {changedItems.Count} changed, {skipped} unchanged items.",
+            Message = $"[Phase 1/5 — Items] Found {newItems.Count} new, {changedItems.Count} changed, {skipped} unchanged items.",
             Total = total
         });
 
@@ -139,7 +140,7 @@ public class ItemSyncProvider : ISyncProvider
                 {
                     ProviderId = ProviderId,
                     Type = SyncEventType.Progress,
-                    Message = $"[Phase 1/4 — Items] Inserted {added} of {newItems.Count} new items...",
+                    Message = $"[Phase 1/5 — Items] Inserted {added} of {newItems.Count} new items...",
                     Current = added,
                     Total = total,
                     Added = added,
@@ -215,7 +216,7 @@ public class ItemSyncProvider : ISyncProvider
                 {
                     ProviderId = ProviderId,
                     Type = SyncEventType.Progress,
-                    Message = $"[Phase 1/4 — Items] Updated {updated} of {changedItems.Count} changed items...",
+                    Message = $"[Phase 1/5 — Items] Updated {updated} of {changedItems.Count} changed items...",
                     Current = added + updated,
                     Total = total,
                     Added = added,
@@ -238,11 +239,14 @@ public class ItemSyncProvider : ISyncProvider
         // Phase 4: Sync NPC sell prices from LandSandBoat
         await SyncBaseSellAsync(db, client, progress, ct);
 
+        // Phase 5: Sync crafting recipes from LandSandBoat
+        await SyncRecipesAsync(db, client, progress, ct);
+
         progress.Report(new SyncProgressEvent
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Completed,
-            Message = $"Sync complete: {added} added, {updated} updated, {skipped} unchanged. Model mappings, NPC pools, and sell prices updated.",
+            Message = $"Sync complete: {added} added, {updated} updated, {skipped} unchanged. Model mappings, NPC pools, sell prices, and crafting recipes updated.",
             Current = total,
             Total = total,
             Added = added,
@@ -281,7 +285,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = "[Phase 2/4 — Model Mappings] Downloading from LandSandBoat...",
+            Message = "[Phase 2/5 — Model Mappings] Downloading from LandSandBoat...",
             Current = itemsAdded + itemsUpdated,
             Total = itemsTotal
         });
@@ -325,7 +329,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = $"[Phase 2/4 — Model Mappings] Parsed {parsed.Count} entries. Updating database..."
+            Message = $"[Phase 2/5 — Model Mappings] Parsed {parsed.Count} entries. Updating database..."
         });
 
         // Load existing mappings for comparison
@@ -394,7 +398,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = $"[Phase 2/4 — Model Mappings] {modelAdded} added, {modelUpdated} updated, {modelSkipped} unchanged."
+            Message = $"[Phase 2/5 — Model Mappings] {modelAdded} added, {modelUpdated} updated, {modelSkipped} unchanged."
         });
     }
 
@@ -413,7 +417,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = "[Phase 3/4 — NPC Pools] Downloading mob pool data from LandSandBoat..."
+            Message = "[Phase 3/5 — NPC Pools] Downloading mob pool data from LandSandBoat..."
         });
 
         string sql;
@@ -428,7 +432,7 @@ public class ItemSyncProvider : ISyncProvider
             {
                 ProviderId = ProviderId,
                 Type = SyncEventType.Progress,
-                Message = "[Phase 3/4 — NPC Pools] Download failed — skipped."
+                Message = "[Phase 3/5 — NPC Pools] Download failed — skipped."
             });
             return;
         }
@@ -468,7 +472,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = $"[Phase 3/4 — NPC Pools] Parsed {parsed.Count} NPC pools. Updating database..."
+            Message = $"[Phase 3/5 — NPC Pools] Parsed {parsed.Count} NPC pools. Updating database..."
         });
 
         // Load existing pools for comparison
@@ -524,7 +528,7 @@ public class ItemSyncProvider : ISyncProvider
                     {
                         ProviderId = ProviderId,
                         Type = SyncEventType.Progress,
-                        Message = $"[Phase 3/4 — NPC Pools] Inserted {npcAdded} pools so far..."
+                        Message = $"[Phase 3/5 — NPC Pools] Inserted {npcAdded} pools so far..."
                     });
                 }
             }
@@ -541,7 +545,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = $"[Phase 3/4 — NPC Pools] {npcAdded} added, {npcUpdated} updated, {npcSkipped} unchanged."
+            Message = $"[Phase 3/5 — NPC Pools] {npcAdded} added, {npcUpdated} updated, {npcSkipped} unchanged."
         });
     }
 
@@ -558,7 +562,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = "[Phase 4/4 — Sell Prices] Downloading item_basic.sql from LandSandBoat..."
+            Message = "[Phase 4/5 — Sell Prices] Downloading item_basic.sql from LandSandBoat..."
         });
 
         string sql;
@@ -573,7 +577,7 @@ public class ItemSyncProvider : ISyncProvider
             {
                 ProviderId = ProviderId,
                 Type = SyncEventType.Progress,
-                Message = "[Phase 4/4 — Sell Prices] Download failed — skipped."
+                Message = "[Phase 4/5 — Sell Prices] Download failed — skipped."
             });
             return;
         }
@@ -596,7 +600,7 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = $"[Phase 4/4 — Sell Prices] Parsed {parsed.Count} entries. Checking for changes..."
+            Message = $"[Phase 4/5 — Sell Prices] Parsed {parsed.Count} entries. Checking for changes..."
         });
 
         // Load existing BaseSell values for change detection
@@ -638,7 +642,200 @@ public class ItemSyncProvider : ISyncProvider
         {
             ProviderId = ProviderId,
             Type = SyncEventType.Progress,
-            Message = $"[Phase 4/4 — Sell Prices] {sellUpdated} updated, {sellSkipped} unchanged."
+            Message = $"[Phase 4/5 — Sell Prices] {sellUpdated} updated, {sellSkipped} unchanged."
+        });
+    }
+
+    /// <summary>
+    /// Sync crafting recipes from LandSandBoat's synth_recipes.sql.
+    /// Uses a clear-and-reinsert strategy: deletes all existing recipes and ingredients
+    /// then inserts fresh data, since recipes change infrequently.
+    /// </summary>
+    private async Task SyncRecipesAsync(
+        VanalyticsDbContext db, HttpClient client,
+        IProgress<SyncProgressEvent> progress,
+        CancellationToken ct)
+    {
+        progress.Report(new SyncProgressEvent
+        {
+            ProviderId = ProviderId,
+            Type = SyncEventType.Progress,
+            Message = "[Phase 5/5 — Crafting Recipes] Downloading synth_recipes.sql from LandSandBoat..."
+        });
+
+        string sql;
+        try
+        {
+            sql = await client.GetStringAsync(SynthRecipesUrl, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to download synth_recipes.sql — skipping recipe sync");
+            progress.Report(new SyncProgressEvent
+            {
+                ProviderId = ProviderId,
+                Type = SyncEventType.Progress,
+                Message = "[Phase 5/5 — Crafting Recipes] Download failed — skipped."
+            });
+            return;
+        }
+
+        // Column order: (ID, Desynth, KeyItem, Wood, Smith, Gold, Cloth, Leather, Bone, Alchemy, Cook,
+        //   Crystal, HQCrystal, Ingredient1-8, Result, ResultHQ1-3, ResultQty, ResultHQ1Qty-3Qty,
+        //   ResultName, content_tag)
+        // Groups 1-29 are integers; group 30 is content_tag (NULL or 'string')
+        var recipeRegex = new System.Text.RegularExpressions.Regex(
+            @"\((\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),(\d+),'[^']*',(NULL|'[^']*')\)");
+
+        var recipes = new List<SynthRecipe>();
+        var ingredientsByRecipeId = new Dictionary<int, List<RecipeIngredient>>();
+
+        foreach (System.Text.RegularExpressions.Match match in recipeRegex.Matches(sql))
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var id         = int.Parse(match.Groups[1].Value);
+            var isDesynth  = match.Groups[2].Value == "1";
+            // group 3 = KeyItem (skip)
+            var wood       = int.Parse(match.Groups[4].Value);
+            var smith      = int.Parse(match.Groups[5].Value);
+            var gold       = int.Parse(match.Groups[6].Value);
+            var cloth      = int.Parse(match.Groups[7].Value);
+            var leather    = int.Parse(match.Groups[8].Value);
+            var bone       = int.Parse(match.Groups[9].Value);
+            var alchemy    = int.Parse(match.Groups[10].Value);
+            var cook       = int.Parse(match.Groups[11].Value);
+            var crystal    = int.Parse(match.Groups[12].Value);
+            var hqCrystal  = int.Parse(match.Groups[13].Value);
+            var ing1       = int.Parse(match.Groups[14].Value);
+            var ing2       = int.Parse(match.Groups[15].Value);
+            var ing3       = int.Parse(match.Groups[16].Value);
+            var ing4       = int.Parse(match.Groups[17].Value);
+            var ing5       = int.Parse(match.Groups[18].Value);
+            var ing6       = int.Parse(match.Groups[19].Value);
+            var ing7       = int.Parse(match.Groups[20].Value);
+            var ing8       = int.Parse(match.Groups[21].Value);
+            var result     = int.Parse(match.Groups[22].Value);
+            var resultHq1  = int.Parse(match.Groups[23].Value);
+            var resultHq2  = int.Parse(match.Groups[24].Value);
+            var resultHq3  = int.Parse(match.Groups[25].Value);
+            var resultQty  = int.Parse(match.Groups[26].Value);
+            var resultHq1Qty = int.Parse(match.Groups[27].Value);
+            var resultHq2Qty = int.Parse(match.Groups[28].Value);
+            var resultHq3Qty = int.Parse(match.Groups[29].Value);
+            var contentTagRaw = match.Groups[30].Value;
+            var contentTag = contentTagRaw == "NULL" ? null : contentTagRaw.Trim('\'');
+
+            recipes.Add(new SynthRecipe
+            {
+                Id           = id,
+                IsDesynth    = isDesynth,
+                Wood         = wood,
+                Smith        = smith,
+                Gold         = gold,
+                Cloth        = cloth,
+                Leather      = leather,
+                Bone         = bone,
+                Alchemy      = alchemy,
+                Cook         = cook,
+                CrystalItemId  = crystal,
+                HqCrystalItemId = hqCrystal == 0 ? null : hqCrystal,
+                ResultItemId = result,
+                ResultQty    = resultQty,
+                ResultHq1ItemId = resultHq1 == 0 ? null : resultHq1,
+                ResultHq1Qty    = resultHq1Qty == 0 ? null : resultHq1Qty,
+                ResultHq2ItemId = resultHq2 == 0 ? null : resultHq2,
+                ResultHq2Qty    = resultHq2Qty == 0 ? null : resultHq2Qty,
+                ResultHq3ItemId = resultHq3 == 0 ? null : resultHq3,
+                ResultHq3Qty    = resultHq3Qty == 0 ? null : resultHq3Qty,
+                ContentTag   = contentTag,
+            });
+
+            // Collapse the 8 ingredient slots into distinct (ItemId, Quantity) pairs.
+            // Group duplicate item IDs and sum their counts; skip slots with value 0.
+            var ingredientSlots = new[] { ing1, ing2, ing3, ing4, ing5, ing6, ing7, ing8 };
+            var collapsed = ingredientSlots
+                .Where(i => i != 0)
+                .GroupBy(i => i)
+                .Select(g => new RecipeIngredient
+                {
+                    RecipeId = id,
+                    ItemId   = g.Key,
+                    Quantity = g.Count(),
+                })
+                .ToList();
+
+            ingredientsByRecipeId[id] = collapsed;
+        }
+
+        progress.Report(new SyncProgressEvent
+        {
+            ProviderId = ProviderId,
+            Type = SyncEventType.Progress,
+            Message = $"[Phase 5/5 — Crafting Recipes] Parsed {recipes.Count} recipes. Clearing existing data..."
+        });
+
+        // Clear-and-reinsert: delete ingredients first (FK references recipes), then recipes
+        await db.RecipeIngredients.ExecuteDeleteAsync(ct);
+        await db.SynthRecipes.ExecuteDeleteAsync(ct);
+
+        progress.Report(new SyncProgressEvent
+        {
+            ProviderId = ProviderId,
+            Type = SyncEventType.Progress,
+            Message = $"[Phase 5/5 — Crafting Recipes] Inserting {recipes.Count} recipes..."
+        });
+
+        // Insert all recipes in batches
+        var recipeInserted = 0;
+        for (var batchStart = 0; batchStart < recipes.Count; batchStart += BatchSize)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var batch = recipes.Skip(batchStart).Take(BatchSize).ToList();
+            db.SynthRecipes.AddRange(batch);
+            await db.SaveChangesAsync(ct);
+            db.ChangeTracker.Clear();
+            recipeInserted += batch.Count;
+
+            progress.Report(new SyncProgressEvent
+            {
+                ProviderId = ProviderId,
+                Type = SyncEventType.Progress,
+                Message = $"[Phase 5/5 — Crafting Recipes] Inserted {recipeInserted} of {recipes.Count} recipes..."
+            });
+        }
+
+        // Insert all ingredients in batches
+        var allIngredients = ingredientsByRecipeId.Values.SelectMany(x => x).ToList();
+
+        progress.Report(new SyncProgressEvent
+        {
+            ProviderId = ProviderId,
+            Type = SyncEventType.Progress,
+            Message = $"[Phase 5/5 — Crafting Recipes] Inserting {allIngredients.Count} ingredients..."
+        });
+
+        var ingredientInserted = 0;
+        for (var batchStart = 0; batchStart < allIngredients.Count; batchStart += BatchSize)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var batch = allIngredients.Skip(batchStart).Take(BatchSize).ToList();
+            db.RecipeIngredients.AddRange(batch);
+            await db.SaveChangesAsync(ct);
+            db.ChangeTracker.Clear();
+            ingredientInserted += batch.Count;
+        }
+
+        _logger.LogInformation("Recipe sync: {Recipes} recipes, {Ingredients} ingredients inserted",
+            recipeInserted, ingredientInserted);
+
+        progress.Report(new SyncProgressEvent
+        {
+            ProviderId = ProviderId,
+            Type = SyncEventType.Progress,
+            Message = $"[Phase 5/5 — Crafting Recipes] {recipeInserted} recipes and {ingredientInserted} ingredients inserted."
         });
     }
 

@@ -1,5 +1,33 @@
+import type { ReactNode } from 'react'
 import type { GameItemDetail } from '../../types/api'
 import { itemImageUrl } from '../../utils/imageUrl'
+import { elementIcon, renderDescriptionWithIcons } from '../../utils/elementIcons'
+
+// Automaton frame elemental grid: two rows of 4 values, positional order
+const AUTOMATON_ROW1 = ['Fire', 'Wind', 'Lightning', 'Light'] as const
+const AUTOMATON_ROW2 = ['Ice', 'Earth', 'Water', 'Dark'] as const
+const AUTOMATON_GRID_RE = /^(\d+) (\d+) (\d+) (\d+)$/
+
+/** Render automaton elemental grid (two rows of "N N N N") with icons */
+function renderAutomatonGrid(lines: string[]): ReactNode[] | null {
+  if (lines.length !== 2) return null
+  const m1 = lines[0].match(AUTOMATON_GRID_RE)
+  const m2 = lines[1].match(AUTOMATON_GRID_RE)
+  if (!m1 || !m2) return null
+
+  const row = (elements: readonly string[], values: RegExpMatchArray) => (
+    <span>
+      {elements.map((el, i) => (
+        <span key={el} style={{ whiteSpace: 'nowrap', marginRight: 4 }}>
+          {elementIcon(el, el)}
+          {values[i + 1]}
+        </span>
+      ))}
+    </span>
+  )
+
+  return [row(AUTOMATON_ROW1, m1), <br key="br" />, row(AUTOMATON_ROW2, m2)]
+}
 
 // FFXI job bitmask → abbreviation
 const JOB_BITS: [number, string][] = [
@@ -132,9 +160,10 @@ export default function ItemPreviewBox({ item }: { item: GameItemDetail }) {
         {/* Stats / Description */}
         {descLines.length > 0 && (
           <div style={{ color: '#E0E0E0', marginTop: 2 }}>
-            {descLines.map((line, i) => (
+            {/* Automaton frames: two rows of "N N N N" → render as icon grid */}
+            {renderAutomatonGrid(descLines) ?? descLines.map((line, i) => (
               <span key={i}>
-                {line}
+                {renderDescriptionWithIcons(line)}
                 {i < descLines.length - 1 && <br />}
               </span>
             ))}

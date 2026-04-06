@@ -15,7 +15,7 @@ import SidebarClock from './SidebarClock'
 type SectionName = 'database' | 'economy' | 'server' | 'community' | 'admin'
 
 function getSection(pathname: string): SectionName | null {
-  if (pathname.startsWith('/items') || pathname.startsWith('/npcs') || pathname.startsWith('/zones')) return 'database'
+  if (pathname.startsWith('/items') || pathname.startsWith('/npcs') || pathname.startsWith('/zones') || pathname.startsWith('/recipes')) return 'database'
   if (pathname.startsWith('/bazaar')) return 'economy'
   if (pathname.startsWith('/forum') || pathname.startsWith('/players') || pathname.startsWith('/users/')) return 'community'
   if (pathname.startsWith('/server/')) return 'server'
@@ -163,6 +163,7 @@ function LayoutInner() {
             <SidebarLink to="/items" end={false} label="Items" icon={<Package className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
             <SidebarLink to="/npcs" label="NPCs" icon={<Bug className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
             <SidebarLink to="/zones" label="Zones" icon={<Map className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
+            <SidebarLink to="/recipes" label="Recipes" icon={<BookOpen className="h-4 w-4 shrink-0" />} onClick={() => setSidebarOpen(false)} />
           </SidebarSection>
 
           {/* Economy section hidden until bazaar sync bugs are resolved

@@ -1,5 +1,6 @@
 // src/Vanalytics.Web/src/components/economy/ItemStatsTable.tsx
 import type { GameItemDetail } from '../../types/api'
+import { renderDescriptionWithIcons } from '../../utils/elementIcons'
 
 // FFXI job bitmask: bit 0 unused, WAR=bit 1, MNK=bit 2, etc.
 // Matches Windower Resources items.lua encoding.
@@ -108,7 +109,14 @@ export default function ItemStatsTable({ item }: { item: GameItemDetail }) {
       {item.description && (
         <div>
           <p className="text-xs text-gray-500 mb-1">Description</p>
-          <p className="text-sm text-gray-400 whitespace-pre-line">{item.description}</p>
+          <p className="text-sm text-gray-400 whitespace-pre-line">
+            {item.description.split('\n').map((line, i, arr) => (
+              <span key={i}>
+                {renderDescriptionWithIcons(line)}
+                {i < arr.length - 1 && '\n'}
+              </span>
+            ))}
+          </p>
         </div>
       )}
     </div>

@@ -7,6 +7,7 @@ import { useCompare } from '../components/compare/CompareContext'
 import ItemPreviewBox from '../components/economy/ItemPreviewBox'
 import ItemModelViewer from '../components/character/ItemModelViewer'
 import ItemOwners from '../components/economy/ItemOwners'
+import ItemCrafting from '../components/economy/ItemCrafting'
 
 export default function ItemDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -158,6 +159,7 @@ export default function ItemDetailPage() {
               <p className="text-sm text-gray-500">This item cannot be sold to NPCs.</p>
             )}
           </div>
+          <ItemCrafting itemId={item.itemId} />
           <div className="rounded-lg border border-gray-800 bg-gray-900 p-4">
             <ItemOwners itemId={item.itemId} />
           </div>

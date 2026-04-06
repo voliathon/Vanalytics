@@ -34,6 +34,8 @@ public class VanalyticsDbContext(DbContextOptions<VanalyticsDbContext> options)
     public DbSet<Macro> Macros => Set<Macro>();
     public DbSet<DismissedAnomaly> DismissedAnomalies => Set<DismissedAnomaly>();
     public DbSet<InventoryMoveOrder> InventoryMoveOrders => Set<InventoryMoveOrder>();
+    public DbSet<SynthRecipe> SynthRecipes => Set<SynthRecipe>();
+    public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

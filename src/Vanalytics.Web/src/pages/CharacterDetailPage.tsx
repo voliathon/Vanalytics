@@ -243,7 +243,7 @@ export default function CharacterDetailPage() {
         </div>
 
         {gearTab === 'Inventory' && (
-          <InventoryTab characterId={character.id} />
+          <InventoryTab characterId={character.id} craftingSkills={character.craftingSkills} />
         )}
 
         {gearTab === 'Macros' && (
