@@ -240,6 +240,7 @@ export interface ThreadDetailResponse {
   isPinned: boolean
   isLocked: boolean
   isDeleted: boolean
+  categoryIsSystem: boolean
   authorId: string
   createdAt: string
   lastPostAt: string
@@ -413,6 +414,7 @@ export interface GameItemSummary {
   tpBonus: number | null
   physicalDamageTaken: number | null
   magicDamageTaken: number | null
+  baseSell: number | null
 }
 
 export interface GameItemDetail {
@@ -463,6 +465,7 @@ export interface GameItemDetail {
   isRare: boolean
   isExclusive: boolean
   isNoAuction: boolean
+  baseSell: number | null
 }
 
 export interface ItemSearchResult {
@@ -688,6 +691,7 @@ export interface InventoryItem {
   iconPath: string | null
   category: string | null
   stackSize: number
+  baseSell: number | null
 }
 
 export type InventoryByBag = Record<string, InventoryItem[]>
