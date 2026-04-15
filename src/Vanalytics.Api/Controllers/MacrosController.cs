@@ -324,7 +324,11 @@ public class MacrosController : ControllerBase
 
     private async Task<MacroBookDetail> GetBookDetail(MacroBook book)
     {
+        // AsNoTracking so we read fresh DB state — callers (e.g. UpdateBook) use
+        // ExecuteDelete which bypasses the change tracker, leaving stale tracked
+        // entities that would otherwise mix with newly-added ones in the result.
         var loadedBook = await _db.MacroBooks
+            .AsNoTracking()
             .Include(b => b.Pages)
                 .ThenInclude(p => p.Macros)
             .FirstAsync(b => b.Id == book.Id);

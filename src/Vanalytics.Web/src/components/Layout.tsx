@@ -128,7 +128,16 @@ function LayoutInner() {
     <FfxiFileSystemProvider>
     <SyncProvider>
     <CompareProvider>
-    <div className="min-h-screen bg-gray-950 text-gray-100 flex">
+    <div className="min-h-screen bg-gray-950 bg-gradient-to-br from-gray-950 via-gray-950 to-indigo-950/50 text-gray-100 flex relative">
+      {/* Ambient radial glow */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{
+          background:
+            'radial-gradient(ellipse 70% 50% at 75% 20%, rgba(99, 102, 241, 0.08), transparent 60%), radial-gradient(ellipse 60% 40% at 15% 85%, rgba(139, 92, 246, 0.06), transparent 60%)',
+        }}
+      />
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -139,10 +148,19 @@ function LayoutInner() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-gray-800 bg-gray-900 transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-gray-800 bg-gradient-to-br from-gray-900/80 via-gray-900/70 to-indigo-950/30 backdrop-blur-sm shadow-[inset_-1px_0_0_rgba(255,255,255,0.03)] transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
+        {/* Sidebar ambient highlight */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{
+            background:
+              'radial-gradient(ellipse 80% 35% at 50% 0%, rgba(139, 92, 246, 0.10), transparent 70%)',
+          }}
+        />
         {/* Logo */}
         <div className="border-b border-gray-800 px-4 py-4">
           <Link to={user ? '/characters' : '/'} className="flex items-center min-w-0" onClick={() => setSidebarOpen(false)}>
@@ -241,7 +259,7 @@ function LayoutInner() {
       </aside>
 
       {/* Main content area */}
-      <div className="flex flex-1 flex-col min-w-0">
+      <div className="flex flex-1 flex-col min-w-0 relative z-10">
         {/* Mobile top bar */}
         <header className="flex items-center gap-3 border-b border-gray-800 bg-gray-900 px-4 py-3 lg:hidden">
           <button

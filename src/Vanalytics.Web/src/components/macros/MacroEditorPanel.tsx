@@ -10,25 +10,31 @@ const SLASH_COMMANDS = [
 
 interface MacroEditorPanelProps {
   macro: MacroDetail
-  onSave: (updated: MacroDetail) => void
+  onSave: (updated: MacroDetail) => void | Promise<void>
   onClose: () => void
 }
 
 export default function MacroEditorPanel({ macro, onSave, onClose }: MacroEditorPanelProps) {
   const [name, setName] = useState(macro.name)
-  const [icon, setIcon] = useState(macro.icon)
   const [lines, setLines] = useState([
     macro.line1, macro.line2, macro.line3,
     macro.line4, macro.line5, macro.line6,
   ])
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [activeLine, setActiveLine] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(null)
 
   useEffect(() => {
     setName(macro.name)
-    setIcon(macro.icon)
     setLines([macro.line1, macro.line2, macro.line3, macro.line4, macro.line5, macro.line6])
   }, [macro])
+
+  useEffect(() => {
+    if (savedAt === null) return
+    const t = setTimeout(() => setSavedAt(null), 2000)
+    return () => clearTimeout(t)
+  }, [savedAt])
 
   const updateLine = (index: number, value: string) => {
     const newLines = [...lines]
@@ -56,19 +62,25 @@ export default function MacroEditorPanel({ macro, onSave, onClose }: MacroEditor
     setActiveLine(null)
   }
 
-  const handleSave = () => {
-    onSave({
-      set: macro.set,
-      position: macro.position,
-      name,
-      icon,
-      line1: lines[0],
-      line2: lines[1],
-      line3: lines[2],
-      line4: lines[3],
-      line5: lines[4],
-      line6: lines[5],
-    })
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await onSave({
+        set: macro.set,
+        position: macro.position,
+        name,
+        icon: macro.icon,
+        line1: lines[0],
+        line2: lines[1],
+        line3: lines[2],
+        line4: lines[3],
+        line5: lines[4],
+        line6: lines[5],
+      })
+      setSavedAt(Date.now())
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -89,18 +101,6 @@ export default function MacroEditorPanel({ macro, onSave, onClose }: MacroEditor
           className="w-full rounded bg-gray-800 border border-gray-700 px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
         />
         <div className="text-[10px] text-gray-600 mt-0.5">{name.length}/8</div>
-      </div>
-
-      <div className="mb-3">
-        <label className="block text-xs text-gray-500 mb-1">Icon</label>
-        <input
-          type="number"
-          min={0}
-          max={255}
-          value={icon}
-          onChange={e => setIcon(Math.min(255, Math.max(0, parseInt(e.target.value) || 0)))}
-          className="w-20 rounded bg-gray-800 border border-gray-700 px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
-        />
       </div>
 
       <div className="space-y-1.5 mb-4">
@@ -134,10 +134,16 @@ export default function MacroEditorPanel({ macro, onSave, onClose }: MacroEditor
 
       <button
         onClick={handleSave}
-        className="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+        disabled={saving}
+        className="w-full rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
       >
-        Save
+        {saving ? 'Saving...' : savedAt !== null ? 'Saved' : 'Save'}
       </button>
+      {savedAt !== null && (
+        <div className="mt-2 text-[11px] text-green-400 text-center">
+          Saved to Vanalytics. Run <code className="text-gray-300">//va macros pull</code> in-game to apply.
+        </div>
+      )}
     </div>
   )
 }

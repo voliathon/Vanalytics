@@ -1214,10 +1214,20 @@ windower.register_event('addon command', function(command, ...)
             config.save(settings)
 
         elseif sub == 'pull' then
-            local pulled = macro_lib.pull(macro_path, settings, http_request, json_decode, settings.ApiUrl, settings.ApiKey, force, log_fn)
+            -- Determine the player's currently active macro book so pull can avoid
+            -- writing DATs that FFXI would immediately overwrite from memory.
+            local active_book = nil
+            local info = windower.ffxi.get_info()
+            if info and info.macro_book then
+                active_book = info.macro_book
+            end
+
+            local pulled = macro_lib.pull(macro_path, settings, http_request, json_encode, json_decode, settings.ApiUrl, settings.ApiKey, force, log_fn, active_book)
             config.save(settings)
             if #pulled > 0 then
                 windower.send_command('input /reloadmacros')
+                windower.add_to_chat(207, '[Vanalytics] DAT files updated. Zone or relogin to load the new macros in-game.')
+                windower.add_to_chat(207, '[Vanalytics] Tip: do NOT switch to the pulled book(s) until after you zone/relogin, or FFXI will overwrite the DAT with its cached copy.')
             end
 
         elseif sub == 'status' then
@@ -1226,6 +1236,9 @@ windower.register_event('addon command', function(command, ...)
                 for _ in pairs(settings.macro_hashes) do count = count + 1 end
             end
             windower.add_to_chat(207, '[Vanalytics] Tracking ' .. count .. ' macro book(s).')
+
+        elseif sub == 'diag' then
+            macro_lib.diag(macro_path, settings, log_fn)
 
         elseif sub == 'dump' then
             local mcr0 = macro_path .. '/' .. macro_lib.dat_filename(0)
@@ -1236,7 +1249,7 @@ windower.register_event('addon command', function(command, ...)
             windower.add_to_chat(207, '[Vanalytics] Macro DAT dumps saved to addon data folder.')
 
         else
-            windower.add_to_chat(207, '[Vanalytics] Usage: //va macros <push|pull|status|dump> [--force]')
+            windower.add_to_chat(207, '[Vanalytics] Usage: //va macros <push|pull|status|diag|dump> [--force]')
         end
 
     elseif command == 'moves' then
@@ -1263,9 +1276,10 @@ windower.register_event('addon command', function(command, ...)
         log('//va session flush   - Manually upload buffered events')
         log('//va session cleanup - Delete old session files')
         log('//va session debug   - Toggle debug mode (logs unmatched chat lines)')
-        log('//va macros push [--force]  - Upload changed macro books')
-        log('//va macros pull [--force]  - Download pending macro updates')
+        log('//va macros push [--force]  - Upload changed macro books (zone first to flush edits)')
+        log('//va macros pull [--force]  - Download pending macro updates (zone to apply in-game)')
         log('//va macros status         - Show tracked macro book count')
+        log('//va macros diag           - Show per-book change-detection state')
         log('//va moves execute   - Execute pending inventory move orders')
         log('//va moves status    - Show pending move order details')
         log('//va help         - Show this help')
