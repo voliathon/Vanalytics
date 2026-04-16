@@ -19,11 +19,13 @@ public class SyncController : ControllerBase
 {
     private readonly VanalyticsDbContext _db;
     private readonly RateLimiter _rateLimiter;
+    private readonly MacroRateLimiter _macroLimiter;
 
-    public SyncController(VanalyticsDbContext db, RateLimiter rateLimiter)
+    public SyncController(VanalyticsDbContext db, RateLimiter rateLimiter, MacroRateLimiter macroLimiter)
     {
         _db = db;
         _rateLimiter = rateLimiter;
+        _macroLimiter = macroLimiter;
     }
 
     [HttpPost]
@@ -268,8 +270,8 @@ public class SyncController : ControllerBase
         var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
         var apiKey = Request.Headers["X-Api-Key"].ToString();
-        if (!_rateLimiter.IsAllowed(apiKey))
-            return StatusCode(429, new { message = "Rate limit exceeded." });
+        if (!_macroLimiter.IsAllowed(apiKey))
+            return StatusCode(429, new { message = "Macro rate limit exceeded. Max 120 requests per hour." });
 
         // Find the character owned by this user (most recently synced)
         var character = await _db.Characters
@@ -411,6 +413,52 @@ public class SyncController : ControllerBase
             return NotFound(new { message = $"Macro book {bookNumber} not found." });
 
         return Ok(MapBookToDetail(book));
+    }
+
+    [HttpGet("macros/pull")]
+    public async Task<IActionResult> PullPendingMacros()
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var character = await _db.Characters
+            .OrderByDescending(c => c.LastSyncAt)
+            .FirstOrDefaultAsync(c => c.UserId == userId);
+        if (character is null)
+            return Ok(new MacroPullResponse());
+
+        var pendingBooks = await _db.MacroBooks
+            .Include(b => b.Pages).ThenInclude(p => p.Macros)
+            .Where(b => b.CharacterId == character.Id && b.PendingPush)
+            .OrderBy(b => b.BookNumber)
+            .ToListAsync();
+
+        return Ok(new MacroPullResponse
+        {
+            Books = pendingBooks.Select(MapBookToDetail).ToList()
+        });
+    }
+
+    [HttpPost("macros/acknowledge")]
+    public async Task<IActionResult> AcknowledgeMacroBooks([FromBody] AcknowledgeMacrosRequest request)
+    {
+        var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+        var character = await _db.Characters
+            .OrderByDescending(c => c.LastSyncAt)
+            .FirstOrDefaultAsync(c => c.UserId == userId);
+        if (character is null)
+            return Ok(new { acknowledged = 0 });
+
+        var bookNumbers = request.BookNumbers ?? [];
+        var books = await _db.MacroBooks
+            .Where(b => b.CharacterId == character.Id && bookNumbers.Contains(b.BookNumber))
+            .ToListAsync();
+
+        foreach (var book in books)
+            book.PendingPush = false;
+
+        await _db.SaveChangesAsync();
+        return Ok(new { acknowledged = books.Count });
     }
 
     [HttpDelete("macros/pending/{bookNumber:int}")]
@@ -573,4 +621,14 @@ public class SyncController : ControllerBase
 public class AcknowledgeMovesRequest
 {
     public List<long> MoveIds { get; set; } = [];
+}
+
+public class AcknowledgeMacrosRequest
+{
+    public List<int> BookNumbers { get; set; } = [];
+}
+
+public class MacroPullResponse
+{
+    public List<MacroBookDetail> Books { get; set; } = [];
 }

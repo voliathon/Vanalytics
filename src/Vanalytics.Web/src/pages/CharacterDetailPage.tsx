@@ -84,7 +84,12 @@ export default function CharacterDetailPage() {
     if (gearTab !== 'Macros' || !id) return
     if (macroBooks.length > 0) return // already loaded
     listMacroBooks(id)
-      .then(setMacroBooks)
+      .then((books) => {
+        setMacroBooks(books)
+        if (books.length > 0 && selectedBookNumber === null) {
+          selectMacroBook(books[0].bookNumber)
+        }
+      })
       .catch((err) => {
         if (err instanceof ApiError) setMacroError(err.message)
         else setMacroError('Failed to load macros')
@@ -314,46 +319,56 @@ export default function CharacterDetailPage() {
                         />
                       </div>
 
-                      {showMacroHistory && selectedBookNumber && id ? (
-                        <MacroHistoryPanel
-                          characterId={id}
-                          bookNumber={selectedBookNumber}
-                          onRestore={(detail) => {
-                            setSelectedBook(detail)
-                            listMacroBooks(id).then(setMacroBooks)
-                          }}
-                          onClose={() => setShowMacroHistory(false)}
-                        />
-                      ) : selectedMacro && (() => {
-                        const page = selectedBook.pages.find(p => p.pageNumber === currentMacroPage)
-                        const macro = page?.macros.find(m => m.set === selectedMacro.set && m.position === selectedMacro.position)
-                        if (!macro) return null
-                        return (
-                          <MacroEditorPanel
-                            macro={macro}
-                            onSave={async (updated) => {
-                              if (!id || !selectedBook) return
-                              const updatedPages = selectedBook.pages.map(p => ({
-                                pageNumber: p.pageNumber,
-                                macros: p.macros.map(m =>
-                                  m.set === updated.set && m.position === updated.position && p.pageNumber === currentMacroPage
-                                    ? updated
-                                    : m
-                                ),
-                              }))
-                              try {
-                                const result = await updateMacroBook(id, selectedBook.bookNumber, { pages: updatedPages })
-                                setSelectedBook(result)
-                                const updatedBooks = await listMacroBooks(id)
-                                setMacroBooks(updatedBooks)
-                              } catch {
-                                setMacroError('Failed to save macro')
-                              }
+                      {/* Fixed-width editor slot: reserves space so opening the editor doesn't shift the reel */}
+                      <div className="w-80 flex-shrink-0">
+                        {showMacroHistory && selectedBookNumber && id ? (
+                          <MacroHistoryPanel
+                            characterId={id}
+                            bookNumber={selectedBookNumber}
+                            onRestore={(detail) => {
+                              setSelectedBook(detail)
+                              listMacroBooks(id).then(setMacroBooks)
                             }}
-                            onClose={() => setSelectedMacro(null)}
+                            onClose={() => setShowMacroHistory(false)}
                           />
-                        )
-                      })()}
+                        ) : selectedMacro ? (() => {
+                          const page = selectedBook.pages.find(p => p.pageNumber === currentMacroPage)
+                          const macro = page?.macros.find(m => m.set === selectedMacro.set && m.position === selectedMacro.position)
+                          if (!macro) return null
+                          return (
+                            <MacroEditorPanel
+                              macro={macro}
+                              onSave={async (updated) => {
+                                if (!id || !selectedBook) return
+                                const updatedPages = selectedBook.pages.map(p => ({
+                                  pageNumber: p.pageNumber,
+                                  macros: p.macros.map(m =>
+                                    m.set === updated.set && m.position === updated.position && p.pageNumber === currentMacroPage
+                                      ? updated
+                                      : m
+                                  ),
+                                }))
+                                try {
+                                  const result = await updateMacroBook(id, selectedBook.bookNumber, { pages: updatedPages })
+                                  setSelectedBook(result)
+                                  const updatedBooks = await listMacroBooks(id)
+                                  setMacroBooks(updatedBooks)
+                                } catch {
+                                  setMacroError('Failed to save macro')
+                                }
+                              }}
+                              onClose={() => setSelectedMacro(null)}
+                            />
+                          )
+                        })() : (
+                          <div className="rounded-lg border border-dashed border-gray-700/60 bg-gray-900/30 p-6 text-center text-xs text-gray-500">
+                            Click any macro to edit it.
+                            <div className="mt-2 text-[10px] text-gray-600">
+                              Saved edits stay on Vanalytics until the addon pulls them in-game.
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ) : (
