@@ -3,7 +3,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { uploadFile } from '../../api/client'
 import {
   Bold, Italic, Strikethrough, Code, Heading2, Heading3,
@@ -98,6 +98,13 @@ export default function ForumEditor({ content = '', onChange, placeholder = 'Wri
       },
     },
   })
+
+  useEffect(() => {
+    if (!editor) return
+    if (content !== editor.getHTML()) {
+      editor.commands.setContent(content, { emitUpdate: false })
+    }
+  }, [content, editor])
 
   const handleUpload = async (file: File) => {
     if (!editor) return
