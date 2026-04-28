@@ -139,6 +139,7 @@ builder.Services.AddHostedService<ServerStatusScraper>();
 // ItemDatabaseSyncJob removed — item data is static game data that only changes
 // when SE patches the game. Sync should only be triggered by an admin from /admin/data.
 builder.Services.AddHostedService<BazaarStalenessJob>();
+builder.Services.AddHostedService<SessionStalenessJob>();
 
 // Forum
 builder.Services.AddForumServices();

@@ -42,14 +42,20 @@ public class SessionController : ControllerBase
         if (character.UserId != userId)
             return StatusCode(403, new { message = "Character is not owned by this account" });
 
-        // If an active session already exists, mark it as Abandoned
+        // If an active session already exists, mark it as Abandoned. Use the last
+        // event timestamp as EndedAt so duration-based stats reflect actual playtime,
+        // not the gap between the crash and the next login.
         var activeSession = await _db.Sessions
             .FirstOrDefaultAsync(s => s.CharacterId == character.Id && s.Status == SessionStatus.Active);
 
         if (activeSession is not null)
         {
+            var lastEventTimestamp = await _db.SessionEvents
+                .Where(e => e.SessionId == activeSession.Id)
+                .MaxAsync(e => (DateTimeOffset?)e.Timestamp);
+
             activeSession.Status = SessionStatus.Abandoned;
-            activeSession.EndedAt = DateTimeOffset.UtcNow;
+            activeSession.EndedAt = lastEventTimestamp ?? activeSession.StartedAt;
         }
 
         var session = new Core.Models.Session
