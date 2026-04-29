@@ -97,7 +97,7 @@ builder.Services.AddOpenApi("v1", options =>
 
 // Services
 builder.Services.AddSingleton<VanadielClock>();
-builder.Services.AddScoped<OAuthService>();
+builder.Services.AddSoveranceOAuth(builder.Configuration);
 builder.Services.AddScoped<DatMappingService>();
 builder.Services.AddSingleton<RateLimiter>();
 builder.Services.AddSingleton<EconomyRateLimiter>();
@@ -139,6 +139,7 @@ builder.Services.AddHostedService<ServerStatusScraper>();
 // ItemDatabaseSyncJob removed — item data is static game data that only changes
 // when SE patches the game. Sync should only be triggered by an admin from /admin/data.
 builder.Services.AddHostedService<BazaarStalenessJob>();
+builder.Services.AddHostedService<SessionStalenessJob>();
 
 // Forum
 builder.Services.AddForumServices();
@@ -282,6 +283,7 @@ app.MapControllers();
 app.MapSamlEndpoints();
 app.MapSamlAdminEndpoints();
 app.MapSamlExchangeEndpoint();
+app.MapOAuthEndpoints();
 var startedAt = DateTimeOffset.UtcNow;
 app.MapGet("/health", async (VanalyticsDbContext db, IHostEnvironment env) =>
 {

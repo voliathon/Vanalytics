@@ -16,15 +16,13 @@ public class AuthController : ControllerBase
 {
     private readonly VanalyticsDbContext _db;
     private readonly TokenService _tokenService;
-    private readonly OAuthService _oauthService;
     private readonly AuthResponseService _authResponseService;
     private readonly LoginRateLimiter _loginRateLimiter;
 
-    public AuthController(VanalyticsDbContext db, TokenService tokenService, OAuthService oauthService, AuthResponseService authResponseService, LoginRateLimiter loginRateLimiter)
+    public AuthController(VanalyticsDbContext db, TokenService tokenService, AuthResponseService authResponseService, LoginRateLimiter loginRateLimiter)
     {
         _db = db;
         _tokenService = tokenService;
-        _oauthService = oauthService;
         _authResponseService = authResponseService;
         _loginRateLimiter = loginRateLimiter;
     }
@@ -51,77 +49,6 @@ public class AuthController : ControllerBase
         }
 
         _loginRateLimiter.ClearFailures(ip);
-        return Ok(await _authResponseService.GenerateAuthResponseAsync(_db, user));
-    }
-
-    [HttpPost("oauth/{provider}")]
-    public async Task<IActionResult> OAuth(string provider, [FromBody] OAuthRequest request)
-    {
-        OAuthUserInfo userInfo;
-        try
-        {
-            userInfo = provider.ToLowerInvariant() switch
-            {
-                "google" => await _oauthService.GetGoogleUserInfoAsync(request.Code, request.RedirectUri),
-                "microsoft" => await _oauthService.GetMicrosoftUserInfoAsync(request.Code, request.RedirectUri),
-                _ => throw new ArgumentException($"Unsupported provider: {provider}")
-            };
-        }
-        catch (ArgumentException)
-        {
-            return BadRequest(new { message = $"Unsupported OAuth provider: {provider}" });
-        }
-        catch (HttpRequestException ex)
-        {
-            return BadRequest(new { message = $"Failed to authenticate with OAuth provider: {ex.Message}" });
-        }
-
-        // Find existing user by OAuth ID, or fall back to email match.
-        // Note: Email-based linking is an MVP convenience. For a higher-security app,
-        // account linking should require explicit user confirmation while authenticated.
-        // Acceptable here because both Google and Microsoft verify email ownership.
-        var user = await _db.Users.FirstOrDefaultAsync(u =>
-            u.OAuthProvider == userInfo.Provider && u.OAuthId == userInfo.ProviderId);
-
-        if (user is not null && userInfo.AvatarUrl is not null)
-        {
-            user.AvatarUrl = userInfo.AvatarUrl;
-            if (userInfo.Name != null)
-                user.DisplayName = userInfo.Name;
-            user.UpdatedAt = DateTimeOffset.UtcNow;
-            await _db.SaveChangesAsync();
-        }
-
-        if (user is null)
-        {
-            user = await _db.Users.FirstOrDefaultAsync(u => u.Email == userInfo.Email);
-            if (user is not null)
-            {
-                user.OAuthProvider = userInfo.Provider;
-                user.OAuthId = userInfo.ProviderId;
-                user.AvatarUrl = userInfo.AvatarUrl;
-                user.UpdatedAt = DateTimeOffset.UtcNow;
-            }
-            else
-            {
-                user = new User
-                {
-                    Id = Guid.NewGuid(),
-                    Email = userInfo.Email,
-                    Username = userInfo.Email,
-                    DisplayName = userInfo.Name,
-                    AvatarUrl = userInfo.AvatarUrl,
-                    OAuthProvider = userInfo.Provider,
-                    OAuthId = userInfo.ProviderId,
-                    CreatedAt = DateTimeOffset.UtcNow,
-                    UpdatedAt = DateTimeOffset.UtcNow
-                };
-                _db.Users.Add(user);
-            }
-
-            await _db.SaveChangesAsync();
-        }
-
         return Ok(await _authResponseService.GenerateAuthResponseAsync(_db, user));
     }
 
