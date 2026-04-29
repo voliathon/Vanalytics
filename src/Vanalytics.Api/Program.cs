@@ -97,7 +97,7 @@ builder.Services.AddOpenApi("v1", options =>
 
 // Services
 builder.Services.AddSingleton<VanadielClock>();
-builder.Services.AddScoped<OAuthService>();
+builder.Services.AddSoveranceOAuth(builder.Configuration);
 builder.Services.AddScoped<DatMappingService>();
 builder.Services.AddSingleton<RateLimiter>();
 builder.Services.AddSingleton<EconomyRateLimiter>();
@@ -283,6 +283,7 @@ app.MapControllers();
 app.MapSamlEndpoints();
 app.MapSamlAdminEndpoints();
 app.MapSamlExchangeEndpoint();
+app.MapOAuthEndpoints();
 var startedAt = DateTimeOffset.UtcNow;
 app.MapGet("/health", async (VanalyticsDbContext db, IHostEnvironment env) =>
 {
